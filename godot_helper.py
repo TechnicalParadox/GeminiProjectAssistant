@@ -84,6 +84,7 @@ def start_gemini_chat(context_message):
     - Prioritize Godot-specific advice and code examples.
     - Refer to the provided context when asked about a file or node. 
     - Ask clarifying questions if you need more information.
+    - Use spaces instead of indentation for code formatting.
     """
 
     model = genai.GenerativeModel(model_name=MODEL_NAME, 
