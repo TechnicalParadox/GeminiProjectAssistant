@@ -20,6 +20,16 @@ NO_SAFETY = {
     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE
 }
 
+# Pricing per 1 million tokens
+INPUT_PRICING = {
+    "upto_128k": 3.50,
+    "over_128k": 7.00
+}
+OUTPUT_PRICING = {
+    "upto_128k": 10.50,
+    "over_128k": 21.00
+}
+
 def get_all_files(directory):
     """Gets a list of all files, ignoring hidden items and specified types."""
     ignored_extensions = ['.tmp', '.svg', '.png', '.ttf', '.import']
@@ -73,6 +83,14 @@ def generate_context_message(selected_files):
         context += f"{file_path}\n```{content}```\n"
     return context
 
+def calculate_cost(tokens, pricing):
+    """Calculates the cost based on token usage and pricing tiers."""
+    million_tokens = tokens / 1_000_000
+    if tokens <= 128_000:
+        return million_tokens * pricing['upto_128k']
+    else:
+        return million_tokens * pricing['over_128k'] 
+
 def start_gemini_chat(context_message):
     """Starts a chat session with Gemini and provides system instructions."""
     genai.configure(api_key=API_KEY)
@@ -84,13 +102,16 @@ def start_gemini_chat(context_message):
     - Prioritize Godot-specific advice and code examples.
     - Refer to the provided context when asked about a file or node. 
     - Ask clarifying questions if you need more information.
-    - Use spaces instead of indentation for code formatting.
+    - Use spaces instead of indentation for code formatting. 
     """
 
     model = genai.GenerativeModel(model_name=MODEL_NAME, 
                                   safety_settings=NO_SAFETY, 
                                   system_instruction=system_instructions)  
     chat = model.start_chat()
+
+    total_input_tokens = 0
+    total_output_tokens = 0
 
     # Add initial user input to context message
     context_message += f"\nInitial instructions: " + input("You: ")
@@ -99,52 +120,13 @@ def start_gemini_chat(context_message):
     print("\nCHAT:")
     print(f"\nYou: {context_message}")
     response = chat.send_message(context_message)
-    '''EXAMPLE RESPONSE:
-        GenerateContentResponse(
-        done=True,
-        iterator=None,
-        result=protos.GenerateContentResponse({
-        "candidates": [
-            {
-            "content": {
-                "parts": [
-                {
-                    "text": "It seems like you're outputting debug information about a player in your game. \n\nTo give you tailored help, could you provide me with the code for your `Player.gd` script, or whichever script is responsible for printing this debug info? Knowing how you're currently handling player movement and outputting this data will allow me to provide more specific guidance. \n"
-                }
-                ],
-                "role": "model"
-            },
-            "finish_reason": "STOP",
-            "index": 0,
-            "safety_ratings": [
-                {
-                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                "probability": "NEGLIGIBLE"
-                },
-                {
-                "category": "HARM_CATEGORY_HATE_SPEECH",
-                "probability": "NEGLIGIBLE"
-                },
-                {
-                "category": "HARM_CATEGORY_HARASSMENT",
-                "probability": "NEGLIGIBLE"
-                },
-                {
-                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                "probability": "NEGLIGIBLE"
-                }
-            ]
-            }
-        ],
-        "usage_metadata": {
-            "prompt_token_count": 5549,
-            "candidates_token_count": 75,
-            "total_token_count": 5624
-        }
-        }),
-    )'''
-    print(f"\nGemini: {response.text}\nTOKENS USED: {response.usage_metadata.total_token_count}")
-    return chat
+    total_input_tokens += response.usage_metadata.prompt_token_count
+    total_output_tokens += response.usage_metadata.candidates_token_count
+    print(f"\nGemini: {response.text}")
+    print(f"INPUT TOKENS: {response.usage_metadata.prompt_token_count}, INPUT COST: ${calculate_cost(response.usage_metadata.prompt_token_count, INPUT_PRICING):.2f}")
+    print(f"OUTPUT TOKENS: {response.usage_metadata.candidates_token_count}, OUTPUT COST: ${calculate_cost(response.usage_metadata.candidates_token_count, OUTPUT_PRICING):.2f}")
+    print(f"SESSION COST: ${calculate_cost(total_input_tokens, INPUT_PRICING) + calculate_cost(total_output_tokens, OUTPUT_PRICING):.2f}") 
+    return chat, total_input_tokens, total_output_tokens
 
 def delete_messages(chat, message_indices):
     """Deletes messages from the chat history."""
@@ -173,9 +155,9 @@ def main():
     all_files = get_all_files(GODOT_PROJECT_DIR)
     selected_files = select_files(all_files)
     context_message = generate_context_message(selected_files)
-    chat = start_gemini_chat(context_message)
+    chat, total_input_tokens, total_output_tokens = start_gemini_chat(context_message)
 
-    print("Chat session started. Type 'exit', 'delete', update, or 'history'.")
+    print("Chat session started. Type 'exit', 'delete', 'update', or 'history'.")
 
     while True:
         user_message = input("\nYou: ")
@@ -194,14 +176,22 @@ def main():
             print("Chat History:")
             for i, message in enumerate(chat.history):
                 print(f"{i}. Role: {message.role}, Content: {message.parts[0].text}\n---\n") 
-        elif user_message.lower() == "update": # New command to update files
+        elif user_message.lower() == "update": 
             response = update_files_in_context(chat, all_files)
-            print(f"\nGemini: {response.text}\nTOKENS USED: {response.usage_metadata.total_token_count}")
-            # Send updated files and input to Gemini API
-
+            total_input_tokens += response.usage_metadata.prompt_token_count
+            total_output_tokens += response.usage_metadata.candidates_token_count
+            print(f"\nGemini: {response.text}")
+            print(f"INPUT TOKENS: {response.usage_metadata.prompt_token_count}, INPUT COST: ${calculate_cost(response.usage_metadata.prompt_token_count, INPUT_PRICING):.2f}")
+            print(f"OUTPUT TOKENS: {response.usage_metadata.candidates_token_count}, OUTPUT COST: ${calculate_cost(response.usage_metadata.candidates_token_count, OUTPUT_PRICING):.2f}")
+            print(f"SESSION COST: ${calculate_cost(total_input_tokens, INPUT_PRICING) + calculate_cost(total_output_tokens, OUTPUT_PRICING):.2f}")
         else:
             response = chat.send_message(user_message)
-            print(f"\nGemini: {response.text}\nTOKENS USED: {response.usage_metadata.total_token_count}")
+            total_input_tokens += response.usage_metadata.prompt_token_count
+            total_output_tokens += response.usage_metadata.candidates_token_count
+            print(f"\nGemini: {response.text}")
+            print(f"INPUT TOKENS: {response.usage_metadata.prompt_token_count}, INPUT COST: ${calculate_cost(response.usage_metadata.prompt_token_count, INPUT_PRICING):.2f}")
+            print(f"OUTPUT TOKENS: {response.usage_metadata.candidates_token_count}, OUTPUT COST: ${calculate_cost(response.usage_metadata.candidates_token_count, OUTPUT_PRICING):.2f}")
+            print(f"SESSION COST: ${calculate_cost(total_input_tokens, INPUT_PRICING) + calculate_cost(total_output_tokens, OUTPUT_PRICING):.2f}") 
 
 if __name__ == "__main__":
     main()
