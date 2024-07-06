@@ -8,7 +8,7 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold
 load_dotenv()
 
 # Configuration
-GODOT_PROJECT_DIR = r"D:\Godot_v4.2.2-stable_win64.exe\projects\SpaceRoguelikeV1"
+GODOT_PROJECT_DIR = os.getenv("PROJECT_DIRECTORY")
 MODEL_NAME = "gemini-1.5-pro-latest"
 API_KEY = os.getenv("API_KEY")
 
