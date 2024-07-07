@@ -232,10 +232,10 @@ def start_gemini_chat(context_message):
     total_output_tokens = 0 # Initialize counter for total output tokens
 
     # Add initial user input to context message
+    print("\033[0mProvide your initial message to the model.")
     context_message += input("\033[92mYou: ")
 
     # Send the context message directly 
-    print("\033[0mProvide your initial message to the model.")
     print(f"\n\033[92mYou: {context_message}") 
     response = chat.send_message(context_message) # Send the initial context message to the model
     total_input_tokens += response.usage_metadata.prompt_token_count # Increment input token count
