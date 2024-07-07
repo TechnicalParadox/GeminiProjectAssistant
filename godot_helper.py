@@ -216,20 +216,20 @@ def start_gemini_chat(context_message):
     )
     chat = model.start_chat() # Initiate a chat session with the model
 
-    sys_instruct_tokens = model.count_tokens(" ") # Count tokens in system instructions
+    sys_instruct_tokens = model.count_tokens(" ").total_tokens # Count tokens in system instructions
     # Store system instructions in message costs
     message_costs.append({
         "role": "system",
-        "tokens": sys_instruct_tokens.total_tokens,
-        "cost": calculate_cost(sys_instruct_tokens.total_tokens, INPUT_PRICING),
+        "tokens": sys_instruct_tokens,
+        "cost": calculate_cost(sys_instruct_tokens, INPUT_PRICING),
         "content": system_instructions
     })
 
     # add tools for the model if needed and if we do then we need to calculate the tokens/cost of the tools
     # no tools right now
 
-    total_input_tokens = 0 # Initialize counter for total input tokens
-    total_output_tokens = 0 # Initialize counter for total output tokens
+    total_input_tokens = 0 # Initialize counter for total input tokens (used in session cost)
+    total_output_tokens = 0 # Initialize counter for total output tokens (used in session cost)
 
     # Add initial user input to context message
     print("\033[0mProvide your initial message to the model.")
@@ -244,7 +244,7 @@ def start_gemini_chat(context_message):
     # Store message cost information
     message_costs.append({
         "role": "user",
-        "tokens": response.usage_metadata.prompt_token_count - sys_instruct_tokens.total_tokens, # Subtract system instruction tokens from initial user input tokens
+        "tokens": response.usage_metadata.prompt_token_count - sys_instruct_tokens, # Subtract system instruction tokens from initial user input tokens
         "cost": calculate_cost(response.usage_metadata.prompt_token_count, INPUT_PRICING),
         "content": context_message
     })
