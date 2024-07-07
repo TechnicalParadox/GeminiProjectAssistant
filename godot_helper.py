@@ -301,6 +301,7 @@ def update_files_in_context(chat, all_files, message_costs, total_input_tokens, 
         print(f"\nYou: Updating files:\n{update_message}") # Display the updated context message
         response = chat.send_message(update_message) # Send the updated context message to the model
 
+# TODO: fix this similar to how we did in the main function
         input_tokens = response.usage_metadata.prompt_token_count - total_input_tokens - total_output_tokens
         output_tokens = response.usage_metadata.candidates_token_count
 
@@ -330,6 +331,7 @@ def save_chat_history(message_costs, total_session_cost):
     if save_history.lower() == 'y':
         # TODO handle bad file name
         file_name = input("Enter a file name for the chat history (e.g., chat_history.json): ")
+        # TODO: try/catch and ask again if failed
         with open(file_name, 'w') as f:
             json.dump({"total_cost": total_session_cost, "messages": message_costs}, f, indent=4)
         print(f"Chat history saved to {file_name}")
@@ -350,7 +352,7 @@ def main():
     print("\nIf you need to setup your .env file, type 'exit' now and hit enter.")
     print("By continuing, you accept full responsibility for any costs incurred and your usage of this application.")
     print("Press enter to continue.")
-    if input() == "exit":
+    if input() != "":
         return
 
     # Ask user to select files for context
@@ -401,11 +403,11 @@ def main():
                 content_preview = content_preview.replace('\n', ' ') 
                 cost_to_keep = calculate_cost(message_data['tokens'], INPUT_PRICING, True)  # Use input pricing for both user and model messages and ensure we calculate based off of global token count
                 if (message_data['role'] == "system"):
-                    print(f"{i}. Tokens: {message_data['tokens']}, Cost to keep: ${cost_to_keep:.4f}\n\033[33mRole: {message_data['role']}, Content: {content_preview}\033[0m\n---")
+                    print(f"{i}. Tokens: {message_data['tokens']}, Cost to keep: ${cost_to_keep:.5f}\n\033[33mRole: {message_data['role']}, Content: {content_preview}\033[0m\n---")
                 elif (message_data['role'] == "user"):
-                    print(f"{i}. Tokens: {message_data['tokens']}, Cost to keep: ${cost_to_keep:.4f}\n\033[92mRole: {message_data['role']}, Content: {content_preview}\033[0m\n---")
+                    print(f"{i}. Tokens: {message_data['tokens']}, Cost to keep: ${cost_to_keep:.5f}\n\033[92mRole: {message_data['role']}, Content: {content_preview}\033[0m\n---")
                 else:
-                    print(f"{i}. Tokens: {message_data['tokens']}, Cost to keep: ${cost_to_keep:.4f}\n\033[94mRole: {message_data['role']}, Content: {content_preview}\033[0m\n---")
+                    print(f"{i}. Tokens: {message_data['tokens']}, Cost to keep: ${cost_to_keep:.5f}\n\033[94mRole: {message_data['role']}, Content: {content_preview}\033[0m\n---")
 
         elif user_message.lower() == "update": # Update files in context
             response, input_tokens, output_tokens = update_files_in_context(chat, all_files, message_costs, total_input_tokens, total_output_tokens) # Update context and get the model's response
