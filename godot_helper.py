@@ -1,5 +1,6 @@
 # TODO: color code the output for user, model, and system messages (user = green, model = blue, system = yellow)
 # TODO: Add color functions for print() and print(f) to a helper file and import/integrate them
+# TODO: Refactor the code to use functions for repetitive tasks
 
 # Import necessary libraries
 import os # Provides functions for interacting with the operating system
