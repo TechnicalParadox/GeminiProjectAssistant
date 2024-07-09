@@ -209,6 +209,7 @@ def start_gemini_chat(context_message):
     - Ask clarifying questions if you need more information.
     - Use spaces instead of indentation for code formatting. 
     """
+    # TODO: Add timeout configuration based on .env
     # Create a GenerativeModel instance with specified settings
     model = genai.GenerativeModel(
         model_name=MODEL_NAME, # Name of the Gemini Pro model
