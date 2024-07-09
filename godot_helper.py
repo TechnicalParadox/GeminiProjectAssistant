@@ -379,6 +379,7 @@ def main():
         elif user_message.lower() == "help": # Display special commands and instructions
             print(HELP_MSG)
 
+        # TODO: Color code based on role
         elif user_message.lower() == "view": # View a full message's content
             while True:
                 try:
