@@ -423,10 +423,11 @@ def main():
         else: # Send a regular chat message
             response = chat.send_message(user_message) # Send the message and receive the model's response
 
+            total_input_tokens += response.usage_metadata.prompt_token_count # Update total input tokens for session cost calculation
+
             input_tokens = response.usage_metadata.prompt_token_count - previous_prompt_token_count - previous_output_token_count
             output_tokens = response.usage_metadata.candidates_token_count
             
-            total_input_tokens += input_tokens # Update total input tokens for session cost calculation
             total_output_tokens += output_tokens # Update total output tokens for session cost calculation
             
             # Store message cost information
