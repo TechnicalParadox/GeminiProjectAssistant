@@ -77,6 +77,8 @@ HELP_MSG = """
 message_costs = []
 # Initialize a global variable to store system instruction tokens
 sys_instruct_tokens = 0
+previous_prompt_token_count = 0
+previous_output_token_count = 0
 
 def get_all_files(directory):
     """Gets a list of all files within a directory, ignoring hidden files and specific file types.
@@ -303,8 +305,7 @@ def update_files_in_context(chat, all_files, message_costs, total_input_tokens, 
         print(f"\nYou: Updating files:\n{update_message}") # Display the updated context message
         response = chat.send_message(update_message) # Send the updated context message to the model
 
-# TODO: fix this similar to how we did in the main function
-        input_tokens = response.usage_metadata.prompt_token_count - total_input_tokens - total_output_tokens
+        input_tokens = response.usage_metadata.prompt_token_count - previous_prompt_token_count - previous_output_token_count
         output_tokens = response.usage_metadata.candidates_token_count
 
         # Store message cost information
