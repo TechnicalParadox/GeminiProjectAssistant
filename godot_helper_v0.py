@@ -77,8 +77,6 @@ HELP_MSG = """
 message_costs = []
 # Initialize a global variable to store system instruction tokens
 sys_instruct_tokens = 0
-previous_prompt_token_count = 0
-previous_output_token_count = 0
 
 def get_all_files(directory):
     """Gets a list of all files within a directory, ignoring hidden files and specific file types.
@@ -259,6 +257,10 @@ def start_gemini_chat(context_message):
         "content": response.text
     })
 
+    # Update previous token counts for next calculation
+    previous_prompt_token_count = response.usage_metadata.prompt_token_count
+    previous_output_token_count = response.usage_metadata.candidates_token_count
+
     print(f"\n\033[94mGemini: {response.text}\033[0m") # Display the model's response
     print(f"INPUT TOKENS: {response.usage_metadata.prompt_token_count}, INPUT COST: ${calculate_cost(response.usage_metadata.prompt_token_count, INPUT_PRICING):.5f}") # Display input token count and cost
     print(f"OUTPUT TOKENS: {response.usage_metadata.candidates_token_count}, OUTPUT COST: ${calculate_cost(response.usage_metadata.candidates_token_count, OUTPUT_PRICING):.5f}") # Display output token count and cost
@@ -302,7 +304,7 @@ def update_files_in_context(chat, all_files, message_costs, total_input_tokens, 
         update_message = generate_context_message(selected_files) # Generate an updated context message with the selected files
         # Add user input to the update message
         update_message += input("\033[96mYou: ") 
-        print(f"\nYou: Updating files:\n{update_message}") # Display the updated context message
+        print(f"\n\033[32mYou: Updating files:\n{update_message}") # Display the updated context message
         response = chat.send_message(update_message) # Send the updated context message to the model
 
         input_tokens = response.usage_metadata.prompt_token_count - previous_prompt_token_count - previous_output_token_count
@@ -321,6 +323,11 @@ def update_files_in_context(chat, all_files, message_costs, total_input_tokens, 
             "cost": calculate_cost(output_tokens, OUTPUT_PRICING),
             "content": response.text
         })
+
+        # Update previous token counts for next calculation
+        previous_prompt_token_count = response.usage_metadata.prompt_token_count
+        previous_output_token_count = output_tokens
+
         return response, input_tokens, output_tokens # Return the model's response
 
 def save_chat_history(message_costs, total_session_cost):
@@ -390,7 +397,7 @@ def main():
                 except (ValueError, IndexError):
                     print("Invalid message index. Please try again.")
 
-        elif user_message.lower() == "delete": # Delete messages from history
+        elif user_message.lower() == "delete": # Delete messages from history # TODO: Fix tokeen calculation by subtracting deleted messages from previous prompt token count
             while True:
                 try:
                     message_indices_str = input("Enter message indices to delete (comma-separated): ") # Prompt for message indices
