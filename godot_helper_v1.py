@@ -98,14 +98,14 @@ def display_help():
 def load_config():
     """Load system instructions from the config file. If not found, use the default system instructions."""
     system_instructions = "You are an expert developer. Assist the user with their needs. Ask questions to clarify the user's requirements. Provide detailed and helpful responses."
-    timeout = 60
+    timeout = 60 # default
     try:
         with open(CONFIG, 'r') as f:
             config = json.load(f)
             system_instructions = config['system_instructions']
             timeout = config['timeout']
     except:
-        print(f"Error loading system prompt from config file ({CONFIG}). Make sure it's set in the .env file. Using default system prompt.", tag='Warning', tag_color='yellow')
+        print(f"Error loading system prompt from config file ({CONFIG}). Make sure it's set in the .env file. Using default system prompt and timeout.", tag='Warning', tag_color='yellow')
     return system_instructions, timeout
 
 def get_context_token_count():
@@ -163,6 +163,10 @@ def main():
     # Print warnings
     print(WARNINGS, tag='Warnings', tag_color='yellow')
 
+    # Print pricing
+    print(f"\nInput: {INPUT_PRICING['upto_128k']} (up to 128k tokens), {INPUT_PRICING['over_128k']} (over 128k tokens)\nOutput: {OUTPUT_PRICING['upto_128k']} (up to 128k tokens), {OUTPUT_PRICING['over_128k']} (over 128k tokens)", tag=f'PRICING ($ per 1 million tokens) as of {PRICING_DATE}', tag_color='magenta')
+
+
     # User agreement
     print('By continuing, you take full responsibility for your use of this application.', tag='User Agreement', tag_color='red')
     accept = input('Do you accept the terms and conditions? (y/N): ')
@@ -199,14 +203,15 @@ def main():
             safety_setting = MEDIUM_SAFETY
             print('Medium Safety', tag='Safety Settings', tag_color='magenta', color='white')
 
-    # Display help message
-    display_help()
 
     # Initialize the Gemini chat session and get the number of tokens used in the system instructions
     chat, si_tokens = initialize_chat(system_instructions, safety_setting)
 
     # Add the system instructions to the chat history
     _all_messages.append({'role': 'system','content': system_instructions, 'tokens': si_tokens})
+
+    # Display help message
+    display_help()
 
     # Main loop
     
