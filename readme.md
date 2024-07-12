@@ -18,8 +18,8 @@
 3. Create your .env file according to the .env-template.
 4. Edit config.json to your specifications.
 5. Open terminal in the installation directory.
-6. Run 'pip install -r requirements.txt
-6. Run 'python3 ./godot_helper_v1.py'
+6. Run `pip install -r requirements.txt`
+6. Run `python3 ./godot_helper_v1.py`
 7. Follow instructions on the screen.
 ## Usage
 You can set the project directory to your Godot project directory. When using this application, you may add relevant files related to the goal you are trying to accomplish. You then converse with the Gemini API, asking it for ideas on how to accomplish something, to debug your code, to generate code, etc. As you get better with prompting, the application becomes more reliable and useful.
