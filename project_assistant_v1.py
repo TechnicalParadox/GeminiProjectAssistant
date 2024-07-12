@@ -94,7 +94,18 @@ def display_help():
     print(HELP_WARNING, tag='Warning', tag_color='yellow')
 
 def load_config():
-    """Load system instructions from the config file. If not found, use the default system instructions."""
+    """Load system instructions from the config file. If not found, use the default system instructions.
+    
+    Args:
+        None
+    
+    Returns:
+        str: The model name to use.
+        str: The system instructions to provide to the model.
+        str: The safety settings to use.
+        int: The timeout setting to use.
+        str: The project directory to use.
+    """
     model = 'gemini-1.5-pro-latest'
     system_instructions = "You are an expert developer. Assist the user with their needs. Ask questions to clarify the user's requirements. Provide detailed and helpful responses." # default
     safety = 'medium' # default
@@ -134,7 +145,13 @@ def load_config():
     return model, system_instructions, safety, timeout, project_dir
 
 def get_context_token_count():
-    """Get the total number of tokens in the context."""
+    """Get the total number of tokens in the context.
+    
+    Args:
+        None
+    
+    Returns:
+        int: The total number of tokens in the context."""
     tokens = 0 # Initialize token count
     for m in _messages:
         tokens += m['tokens']
@@ -178,7 +195,16 @@ def initialize_chat(model_name, instructions, safety = MEDIUM_SAFETY,):
     return model.start_chat(), model.count_tokens(" ").total_tokens
 
 def add_message(role, content, tokens):
-    """Add a message to the lists."""
+    """Add a message to the history lists.
+    
+    Args:
+        role (str): The role of the message sender.
+        content (str): The content of the message.
+        tokens (int): The number of tokens used in the message.
+    
+    Returns:
+        None
+    """
     cost = calculate_cost(tokens, INPUT_PRICING)
     _all_messages.append({'role': role, 'content': content, 'tokens': tokens, 'cost': cost})
     _messages.append({'role': role, 'content': content, 'tokens': tokens, 'cost': cost})
