@@ -11,9 +11,6 @@ load_dotenv()
 
 # Load the environment variables
 API_KEY = os.getenv('API_KEY') # The API key
-PROJECT_DIR = os.getenv('PROJECT_DIRECTORY') # The project directory
-MODEL = os.getenv('MODEL') # The model to use
-SAFETY = os.getenv('SAFETY') # The safety setting
 CONFIG = os.getenv('CONFIG') # The config file
 
 # Gemini Safety Settings - for more info visit https://ai.google.dev/gemini-api/docs/safety-settings
@@ -48,6 +45,7 @@ HIGH_SAFETY = {
 
 # Gemini Pricing per 1 million tokens (as of July 10, 2024)
 PRICING_DATE = '2024-07-10'
+PRICING_MODEL = 'gemini-1.5-pro-latest'
 INPUT_PRICING = {
     "upto_128k": 3.50, # Price per million tokens for prompts up to 128,000 tokens
     "over_128k": 7.00 # Price per million tokens for prompts over 128,000 tokens
@@ -97,16 +95,43 @@ def display_help():
 
 def load_config():
     """Load system instructions from the config file. If not found, use the default system instructions."""
-    system_instructions = "You are an expert developer. Assist the user with their needs. Ask questions to clarify the user's requirements. Provide detailed and helpful responses."
+    model = 'gemini-1.5-pro-latest'
+    system_instructions = "You are an expert developer. Assist the user with their needs. Ask questions to clarify the user's requirements. Provide detailed and helpful responses." # default
+    safety = 'medium' # default
     timeout = 60 # default
+    project_dir = None # default
+    # Load configuration from file
     try:
         with open(CONFIG, 'r') as f:
             config = json.load(f)
-            system_instructions = config['system_instructions']
-            timeout = config['timeout']
+            # Load model
+            try:
+                model = config['model']
+            except:
+                print(f"Error loading model from config file. Using {model}", tag='Warning', tag_color='yellow')
+            # Load system instructions
+            try:
+                system_instructions = config['system_instructions']
+            except:
+                print(f"Error loading system instructions from config file. Using default value.", tag='Warning', tag_color='yellow')
+            # Load safety setting
+            try:
+                safety = config['safety']
+            except:
+                print(f"Error loading safety setting from config file. Using default {safety} safety settings.", tag='Warning', tag_color='yellow')
+            # Load timeout
+            try:
+                timeout = config['timeout']
+            except: 
+                print(f"Error loading timeout from config file. Using default {timeout} seconds.", tag='Warning', tag_color='yellow')
+            # Load project directory
+            try:
+                project_dir = config['project_dir']
+            except:
+                print(f"Error loading project directory from config file, this will severely limit usefullness of this application.", tag='Critical', tag_color='red')
     except:
-        print(f"Error loading system prompt from config file ({CONFIG}). Make sure it's set in the .env file. Using default system prompt and timeout.", tag='Warning', tag_color='yellow')
-    return system_instructions, timeout
+        print(f"Error loading config file ({CONFIG}). Make sure it's set in the .env file. Using default values.", tag='Warning', tag_color='yellow')
+    return model, system_instructions, safety, timeout, project_dir
 
 def get_context_token_count():
     """Get the total number of tokens in the context."""
@@ -133,17 +158,23 @@ def calculate_cost(tokens, pricing, history=False):
     else: 
         return million_tokens * pricing['over_128k'] # Calculate cost using the higher tier pricing
 
-def initialize_chat(instructions, safety = MEDIUM_SAFETY,):
-    """Initialize the Gemini chat session.
-    
-    Args: instructions (str): The system instructions for the chat session.
-          safety (dict): The safety settings for the chat session.
+def initialize_chat(model_name, instructions, safety = MEDIUM_SAFETY,):
+    """Initialize the chat session with the Gemini model.
+
+    Args:
+        model_name (str): The name of the model to use.
+        instructions (str): The system instructions to provide to the model.
+        safety (dict): The safety settings to use.
     
     Returns:
-        tuple: A tuple containing the chat session and number of tokens used in system instructions."""
+        genai.ChatSession: The chat session object.
+        int: The number of tokens used in the system instructions.
+    """
     
     genai.configure(api_key=API_KEY) # Configure the API key
-    model = genai.GenerativeModel(model_name = MODEL, safety_settings=safety, system_instruction=instructions) # Initialize the GenerativeModel
+    model = genai.GenerativeModel(model_name = model_name, safety_settings=safety, system_instruction=instructions) # Initialize the GenerativeModel
+
+    # Return the chat session and the number of tokens used in the system instructions
     return model.start_chat(), model.count_tokens(" ").total_tokens
 
 def add_message(role, content, tokens):
@@ -164,8 +195,7 @@ def main():
     print(WARNINGS, tag='Warnings', tag_color='yellow')
 
     # Print pricing
-    print(f"\nInput: {INPUT_PRICING['upto_128k']} (up to 128k tokens), {INPUT_PRICING['over_128k']} (over 128k tokens)\nOutput: {OUTPUT_PRICING['upto_128k']} (up to 128k tokens), {OUTPUT_PRICING['over_128k']} (over 128k tokens)", tag=f'PRICING ($ per 1 million tokens) as of {PRICING_DATE}', tag_color='magenta')
-
+    print(f"\nInput: {INPUT_PRICING['upto_128k']} (up to 128k tokens), {INPUT_PRICING['over_128k']} (over 128k tokens)\nOutput: {OUTPUT_PRICING['upto_128k']} (up to 128k tokens), {OUTPUT_PRICING['over_128k']} (over 128k tokens)", tag=f'PRICING for {PRICING_MODEL} ($ per 1 million tokens) as of {PRICING_DATE}', tag_color='magenta')
 
     # User agreement
     print('By continuing, you take full responsibility for your use of this application.', tag='User Agreement', tag_color='red')
@@ -175,37 +205,37 @@ def main():
         quit()
 
     # Verify environment variables are set
-    if (not API_KEY or not PROJECT_DIR or not MODEL or not SAFETY):
+    if (not API_KEY or  not CONFIG):
         # Exit if not set
         print("Set your .env as specified in the .env-template", tag='Error', tag_color='red')
         quit()
 
-    # Load the system prompt
-    system_instructions, timeout = load_config()
+    # Load the config file
+    model, system_instructions, safety, timeout, project_dir = load_config()
     print(system_instructions, tag='System Instructions', tag_color='magenta', color='white')
 
+
     # Load the safety settings
-    safety_setting = None
-    match SAFETY:
+    match safety:
         case "none":
-            safety_setting = NO_SAFETY
+            safety = NO_SAFETY
             print('No Safety', tag='Safety Settings', tag_color='magenta', color='white')
         case "low":
-            safety_setting = LOW_SAFETY
+            safety = LOW_SAFETY
             print('Low Safety', tag='Safety Settings', tag_color='magenta', color='white')
         case "medium":
-            safety_setting = MEDIUM_SAFETY
+            safety = MEDIUM_SAFETY
             print('Medium Safety', tag='Safety Settings', tag_color='magenta', color='white')
         case "high":
-            safety_setting = HIGH_SAFETY
+            safety = HIGH_SAFETY
             print('High Safety', tag='Safety Settings', tag_color='magenta', color='white')
         case _: # Default
-            safety_setting = MEDIUM_SAFETY
+            safety = MEDIUM_SAFETY
             print('Medium Safety', tag='Safety Settings', tag_color='magenta', color='white')
 
 
     # Initialize the Gemini chat session and get the number of tokens used in the system instructions
-    chat, si_tokens = initialize_chat(system_instructions, safety_setting)
+    chat, si_tokens = initialize_chat(model, system_instructions, safety)
 
     # Add the system instructions to the chat history
     _all_messages.append({'role': 'system','content': system_instructions, 'tokens': si_tokens})
