@@ -16,13 +16,13 @@
 1. Download the zip and extract files to the directory you wish to install in.
 2. Open installation directory.
 3. Create your .env file according to the .env-template.
-4. Edit config.json to your specifications.
+4. Create config.json to your specifications according to config.json-template.
 5. Open terminal in the installation directory.
 6. Run `pip install -r requirements.txt`
 6. Run `python3 ./project_assistant_v1.py`
 7. Follow instructions on the screen.
 ## Usage
-You can set the project directory to your Godot project directory. When using this application, you may add relevant files related to the goal you are trying to accomplish. You then converse with the Gemini API, asking it for ideas on how to accomplish something, to debug your code, to generate code, etc. As you get better with prompting, the application becomes more reliable and useful.
+You can set the project directory to your project directory. When using this application, you may add relevant files related to the goal you are trying to accomplish. You then converse with the Gemini API, asking it for ideas on how to accomplish something, to debug your code, to generate code, etc. As you get better with prompting, the application becomes more reliable and useful.
 
 ![A image showing the startup message when launching the application.](images/readme.png)
 
