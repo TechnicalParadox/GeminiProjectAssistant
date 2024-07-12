@@ -158,7 +158,7 @@ def main():
     print('Make sure to add the .env file to your .gitignore to keep your API key secure.', tag='CRITICAL', tag_color='red')
 
     # Print instructions
-    print(INSTRUCTIONS, tag='Welcome to GodotHelperV1!', tag_color='cyan')
+    print(INSTRUCTIONS, tag='Welcome to Gemini Project Assistant v1!', tag_color='cyan')
 
     # Print warnings
     print(WARNINGS, tag='Warnings', tag_color='yellow')
