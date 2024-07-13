@@ -24,8 +24,7 @@
 6. Run `python3 ./project_assistant_v1.py`
 7. Follow instructions on the screen.
 ## Usage
-##### Example of saved output log
-[an example of a saved output log in markdown format.](https://github.com/TechnicalParadox/GeminiProjectAssistant/blob/master/examples/example_use.md)
+[example of a saved output log in markdown format.](https://github.com/TechnicalParadox/GeminiProjectAssistant/blob/master/examples/example_use.md)
 
 You can set the project directory to your project directory. When using this application, you may add relevant files related to the goal you are trying to accomplish. You then converse with the Gemini API, asking it for ideas on how to accomplish something, to debug your code, to generate code, etc. As you get better with prompting, the application becomes more reliable and useful.
 
