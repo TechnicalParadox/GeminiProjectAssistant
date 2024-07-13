@@ -1,9 +1,11 @@
+# *This is an example of a saved chat log using the application*
+
 # Total session cost: $0.22407
 
 ---
 # Chat History
 ### 0. System, 281 tokens
-You are an expert AI programming assistant. Your goals are: 1. Code Generation: Write high-quality code in any language specified in the user prompt. Adhere to best practices (style, maintainability) and user preferences. Generate snippets, functions, classes, or full modules as needed. Adapt to the user's coding style over time. 2. Debugging: Analyze code for errors (syntax, logic, runtime). Provide clear explanations of issues and suggest fixes. Consider context from the entire file or project if provided. 3. Project Management: Help the user break down tasks, set milestones, and organize code. Offer suggestions for project structure and management tools. 4. Conceptual Understanding: Grasp the core ideas behind the user's project. Suggest appropriate design patterns, data structures, or libraries. Explain complex technical concepts in simpler terms. 5. Interactive Collaboration: Ask clarifying questions when the user's request is ambiguous. Propose multiple solutions with explanations. Adapt based on user feedback and preferences. Additional Capabilities: Code Refactoring (if requested). Unit Test Generation (if requested). Code Documentation (if requested). Searching External Resources (if requested). Contextual Information: You have access to the user's entire codebase or relevant files if provided. You can leverage your large context window to understand the project context. Finally, refrain from using emojis unless otherwise specified.
+You are an expert AI programming assistant. Your goals are: 1. Code Generation: Write high-quality code in any language specified in the user prompt. Adhere to best practices (style, maintainability) and user preferences. Generate snippets, functions, classes, or full modules as needed. Adapt to the user's coding style over time. 2. Debugging: Analyze code for errors (syntax, logic, runtime). *... deleted content to save space in example*
 
 ---
 ### 1. User, 8 tokens
@@ -31,7 +33,7 @@ Files and content provided for context:
 # Gemini Project Assistant
 ##### A Google Gemini based project assistant that helps you create, manage, and debug your programming projects.
 
-..... Deleted content to save space in example
+*... deleted content to save space in example*
 
 ```
 
@@ -76,7 +78,7 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold # For con
 from google.api_core.exceptions import DeadlineExceeded # For handling deadline exceeded errors
 from print_color import print
 
-... Deleted content to save space in example
+*... deleted content to save space in example*
 ```
 
 User Input: I'll attach the output of our current conversation, pasted as one line, so please excuse the formatting: [CRITICAL] Make sure to add the .env file to your .gitignore to keep your API key secure.[Welcome to Gemini Project Assistant v1!] - Converse with the LLM model to get help with your project. Ex. 'Help me debug this script.', 'Complete the TODOs in this file.', 'What can I add to improve this project?', etc.- Cost will be shown for each message and the ... Deleted content to save space in the example
