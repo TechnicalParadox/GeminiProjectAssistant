@@ -97,7 +97,7 @@ def display_help():
     print(HELP_WARNING, tag='Warning', tag_color='yellow')
 
 def load_config():
-    """Load system instructions from the config file. If not found, use the default system instructions.
+    """Load system instructions from the config file. If not found, help create.
     
     Args:
         None
@@ -117,7 +117,7 @@ def load_config():
     config_file = os.path.join(script_dir, 'config.json') # Set the path to the config file
 
     model = 'gemini-1.5-pro-latest'
-    system_instructions = "You are an expert developer. Assist the user with their needs. Ask questions to clarify the user's requirements. Provide detailed and helpful responses. Refrain from using emojis." # default
+    system_instructions = "You are an expert AI programming assistant. Your goals are: 1. Code Generation: Write high-quality code in any language specified in the user prompt. Adhere to best practices (style, maintainability) and user preferences. Generate snippets, functions, classes, or full modules as needed. Adapt to the user's coding style over time. 2. Debugging: Analyze code for errors (syntax, logic, runtime). Provide clear explanations of issues and suggest fixes. Consider context from the entire file or project if provided. 3. Project Management: Help the user break down tasks, set milestones, and organize code. Offer suggestions for project structure and management tools. 4. Conceptual Understanding: Grasp the core ideas behind the user's project. Suggest appropriate design patterns, data structures, or libraries. Explain complex technical concepts in simpler terms. 5. Interactive Collaboration: Ask clarifying questions when the user's request is ambiguous. Propose multiple solutions with explanations. Adapt based on user feedback and preferences. Additional Capabilities: Code Refactoring (if requested). Unit Test Generation (if requested). Code Documentation (if requested). Searching External Resources (if requested). Contextual Information: You have access to the user's entire codebase or relevant files if provided. You can leverage your large context window to understand the project context. Finally, refrain from using emojis unless otherwise specified." # default
     safety = 'medium' # default
     timeout = 60 # default
     project_dir = None # default
@@ -176,7 +176,59 @@ def load_config():
             except:
                 print(f"Error loading stop_sequences from config file. Using default value. ({stop_sequences})", tag='Warning', tag_color='yellow')
     except:
-        print(f"Error loading config file ({config_file}). Make sure it exists in same director as {os.path.basename(__file__)}. Using default values.", tag='Warning', tag_color='yellow')
+        try:
+            print(f"Error loading config file ({config_file}). Make sure it exists in same directory as {os.path.basename(__file__)}. Using default values.", tag='Warning', tag_color='yellow')
+            if input('Would you like to create a config.json now? (y/N): ').lower() == 'y':
+                print('Creating config file... Leave input empty to use default values.', color='magenta')
+                
+                user_model = input('Enter the model name to use (default: gemini-1.5-pro-latest): ')
+                model = user_model if user_model != '' else model
+
+                print(f'Default system instructions: {system_instructions}', color='magenta)
+                user_system_instructions = input('Enter the system instructions to provide to the model: ')
+                system_instructions = user_system_instructions if user_system_instructions != '' else system_instructions
+
+                user_safety = input('Enter the safety settings to use (none, low, medium, high): ')
+                safety = user_safety if user_safety != '' else safety
+
+                user_timeout = int(input('Enter the response timeout setting to use in seconds (default: 60): '))
+                timeout = user_timeout if user_timeout != '' else timeout
+
+                print('This is the path to the project directory you want to work in. This is important for context. Leave empty if you do not want to use this feature.', color='magenta')
+                user_project_dir = input('Enter the full project directory to use (default: None): ')
+                project_dir = user_project_dir if user_project_dir != '' else project_dir
+
+                user_ignored_extensions = input('Enter the file extensions to ignore in the project directory (comma-separated). Hidden files are ignored: ').split(',')
+                ignored_extensions = user_ignored_extensions if user_ignored_extensions != '' else ignored_extensions
+                
+                user_temperature = input('Enter the temperature setting to use (default: 1.0): ')
+                temperature = float(user_temperature) if user_temperature != '' else temperature
+
+                user_max_output_tokens = input('Enter the max_output_tokens setting to use (default: 8192, this is default model\'s limit): ')
+                max_output_tokens = int(user_max_output_tokens) if user_max_output_tokens != '' else max_output_tokens
+
+                user_stop_sequences = input('Enter the stop sequences to use (comma-separated, default None): ').split(',')
+                stop_sequences = user_stop_sequences if user_stop_sequences != '' else stop_sequences
+
+                config = {
+                    'model': model,
+                    'system_instructions': system_instructions,
+                    'safety': safety,
+                    'timeout': timeout,
+                    'project_directory': project_dir,
+                    'ignored_extensions': ignored_extensions,
+                    'temperature': temperature,
+                    'max_output_tokens': max_output_tokens,
+                    'stop_sequences': stop_sequences
+                }
+                with open(config_file, 'w') as f:
+                    json.dump(config, f, indent=4)
+                print(f'Config file created at {config_file}.', tag='Success', tag_color='green')
+            else:
+                print('Using default values...', color='magenta')
+        except Exception as e:
+            print('Error creating config file.', tag='Error', tag_color='red')
+
     return model, system_instructions, safety, timeout, project_dir, ignored_extensions, temperature, max_output_tokens, stop_sequences
 
 def get_context_token_count():
