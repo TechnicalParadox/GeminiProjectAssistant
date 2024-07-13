@@ -287,11 +287,11 @@ def main():
         print()
 
         match user_input:
-            case 'exit':
+            case 'exit': # Exit chat session, give user option to save chat history
                 pass
-            case 'delete':
+            case 'delete': # Delete messages
                 pass
-            case 'files':
+            case 'files': # Add files to context
                 pass
             case 'history': # Display chat history
                 print(tag='Chat History', tag_color='magenta')
@@ -312,16 +312,21 @@ def main():
                             print(content_preview, tag='Model', tag_color='blue')
             case 'view': # View a full message's content
                 message_index = input('Enter the message index to view: ') # Get message index from user
-                match _messages[int(message_index)]['role']: # Display and color message content based on role
-                    case 'System':
-                        print(_messages[int(message_index)]['content'], tag='System', tag_color='magenta')
-                    case 'User':
-                        print(_messages[int(message_index)]['content'], tag='User', tag_color='green')
-                    case 'Model':
-                        print(_messages[int(message_index)]['content'], tag='Model', tag_color='blue')
+                try:
+                    match _messages[int(message_index)]['role']: # Display and color message content based on role
+                        case 'System':
+                            print(_messages[int(message_index)]['content'], tag='System', tag_color='magenta')
+                        case 'User':
+                            print(_messages[int(message_index)]['content'], tag='User', tag_color='green')
+                        case 'Model':
+                            print(_messages[int(message_index)]['content'], tag='Model', tag_color='blue')
+                except IndexError:
+                    print(f'Invalid message index. Message index out of range. Enter between 0 and {len(_messages) - 1}.', tag='Error', tag_color='red')
+                except ValueError:
+                    print('Invalid message index. Enter a valid integer.', tag='Error', tag_color='red')
             case 'help': # Display help message
                 print(HELP_MSG, tag='Help', tag_color='cyan')
-            case _:
+            case _: # Send user input to the model
                 pass
 
 
