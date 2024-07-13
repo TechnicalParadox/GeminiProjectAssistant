@@ -421,7 +421,7 @@ def main():
                 try:
                     input_tokens, output_tokens, response = send_message(chat, message, timeout) # Send the message to the model
                 except Exception as e:
-                    tokens = model.count_tokens(message).total_tokens - si_tokens
+                    tokens = model.count_tokens([{'role': 'user', 'parts':[message]}]).total_tokens - si_tokens
                     total_input_tokens += tokens
                     add_message('User', message, tokens) # Add the user message to the chat history
                     print(message, tag='You', tag_color='green') # Print the user's message
@@ -431,10 +431,10 @@ def main():
                 total_input_tokens += input_tokens
                 total_output_tokens += output_tokens
 
-                add_message('User', message, model.count_tokens(message).total_tokens - si_tokens) # Add the user message to the chat history
+                add_message('User', message, model.count_tokens([{'role': 'user', 'parts':[message]}]).total_tokens - si_tokens) # Add the user message to the chat history
                 print(message+'\n', tag='You', tag_color='green') # Print the user's message
 
-                add_message('Model', response, output_tokens) # Add the model response to the chat history
+                add_message('Model', response, model.count_tokens([{'role': 'model', 'parts':[response]}]).total_tokens - si_tokens) # Add the model response to the chat history
                 print(response, tag='Model', tag_color='blue') # Print the model's response
                 
                 # Print the number of input and output tokens used and the costs
@@ -481,7 +481,7 @@ def main():
                 try:
                     input_tokens, output_tokens, response = send_message(chat, user_input, timeout) # Send the message to the model
                 except Exception as e:
-                    tokens = model.count_tokens(user_input).total_tokens - si_tokens
+                    tokens = model.count_tokens([{'role': 'user', 'parts':[user_input]}]).total_tokens - si_tokens
                     total_input_tokens += tokens
                     add_message('User', user_input, tokens) # Add the user message to the chat history
                     print(user_input+'\n', tag='You', tag_color='green') # Print the user's message
@@ -491,10 +491,10 @@ def main():
                 total_input_tokens += input_tokens
                 total_output_tokens += output_tokens
 
-                add_message('User', user_input, model.count_tokens(user_input).total_tokens - si_tokens) # Add the user message to the chat history
+                add_message('User', user_input, model.count_tokens([{'role': 'user', 'parts':[user_input]}]).total_tokens - si_tokens) # Add the user message to the chat history
                 print(user_input+'\n', tag='You', tag_color='green') # Print the user's message
 
-                add_message('Model', response, output_tokens) # Add the model response to the chat history
+                add_message('Model', response, model.count_tokens([{'role': 'model', 'parts':[response]}]).total_tokens - si_tokens) # Add the model response to the chat history
                 print(response, tag='Model', tag_color='blue') # Print the model's response
                 
                 # Print the number of input and output tokens used and the costs
