@@ -456,7 +456,7 @@ def main():
     # Verify environment variables are set # TODO: Manually enter API key if no .env is found
     global API_KEY
     if (not API_KEY):
-        # Exit if not set
+        # Offer to manually enter API key, if not set exit
         print("Set your .env as specified in the .env-template", tag='Error', tag_color='red')
         if input('Would you like to manually enter your API key? (y/N): ').lower() == 'y':
             API_KEY = input('Enter your API key (https://aistudio.google.com/app/apikey): ')
@@ -464,8 +464,10 @@ def main():
                 print('API key not set. Exiting...', tag='Error', tag_color='red')
                 quit
             else:
+                print('You should add the API key to your .env file.', tag='Warning', tag_color='yellow')
                 print('Be sure not to accidentally copy/share your API key from the terminal.', tag='Critical', tag_color='red')
         else:
+            print('Place your API key in the .env file and restart the program.', tag='Error', tag_color='red')
             quit()
 
     # Load the config file # TODO: If no config file is found, generate one with defaults and user input
