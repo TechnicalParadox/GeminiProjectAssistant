@@ -10,6 +10,12 @@
     "timeout": 180,
     # The directory of the project you are working on. It should be the full path. This example is for me on Linux. For Windows (C:\\Users\you\Development\Programming\Python\GeminiProjectAssistant)
     "project_directory": "/home/tech/Development/Programming/Python/GeminiProjectAssistant/",
-    # A list of file extensions to ignore in the directory
-    "ignored_extensions": [".gitignore", ".env"]
+    # A list of file extensions to ignore in the project directory. [".png", ".mp4"] etc if you don't want them showing.
+    "ignored_extensions": [],
+    # Controls the randomness of the output. The default for Gemini is 1.0 but values can range from 0.0 to 2.0.
+    "temperature": 1.0,
+    # Controls the maximum number of tokens used in a response. gemini-1.5-pro-latest max output is currently 8,192
+    "max_output_tokens": 8192,
+    # Up to 5 character sequences that will stop output generation. They will not be included in the response. For example ["end of code"] should stop the model from explaining itself after generating code, if you instruct it to "write 'end of code' when you are finished generating code"
+    "stop_sequences": []
 }

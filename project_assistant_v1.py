@@ -47,7 +47,7 @@ HIGH_SAFETY = {
 }
 
 # Gemini Pricing per 1 million tokens (as of July 10, 2024)
-PRICING_DATE = '2024-07-10'
+PRICING_DATE = '2024-07-13'
 PRICING_MODEL = 'gemini-1.5-pro-latest'
 INPUT_PRICING = {
     "upto_128k": 3.50, # Price per million tokens for prompts up to 128,000 tokens
@@ -80,7 +80,7 @@ WARNINGS = '''
 HELP_MSG = '''
 'exit' - Exit the chat session and give the option to save chat history.
 'delete' - Delete messages from chat history.
-'files' - Add files to context from project directory.
+'files' - Add files and their paths to context from project directory.
 'history' - Display concise chat history.
 'view' - View a full message's content.
 'help' - Display special commands and instructions.'''
@@ -109,13 +109,20 @@ def load_config():
         int: The timeout setting to use.
         str: The project directory to use.
         list: A list of file extensions to ignore in the project directory.
+        float: The temperature setting to use.
+        int: The maxOutputTokens setting to use.
+        list: A list of stop sequences to use.
     """
     model = 'gemini-1.5-pro-latest'
     system_instructions = "You are an expert developer. Assist the user with their needs. Ask questions to clarify the user's requirements. Provide detailed and helpful responses. Refrain from using emojis." # default
     safety = 'medium' # default
     timeout = 60 # default
     project_dir = None # default
-    ignored_extensions = ['.gitignore'] # default
+    ignored_extensions = [] # default
+    temperature = 1.0 # default
+    max_output_tokens = 8192 # default
+    stop_sequences = [] # default
+
     # Load configuration from file
     try:
         with open(CONFIG, 'r') as f:
@@ -149,10 +156,25 @@ def load_config():
             try:
                 ignored_extensions = config['ignored_extensions']
             except:
-                print("Error loading ignored extensions from config file. Using default ignored extensions.", tag='Warning', tag_color='yellow')
+                print(f"Error loading ignored extensions from config file. Using default ignored extensions. ({ignored_extensions})", tag='Warning', tag_color='yellow')
+            # Load temperature
+            try:
+                temperature = config['temperature']
+            except:
+                print(f"Error loading temperature from config file. Using default value. ({temperature})", tag='Warning', tag_color='yellow')
+            # Load maxOutputTokens
+            try:
+                max_output_tokens = config['max_output_tokens']
+            except:
+                print(f"Error loading max_output_tokens from config file. Using default value. ({max_output_tokens})", tag='Warning', tag_color='yellow')
+            # Load stopSequences
+            try:
+                stop_sequences = config['stop_sequences']
+            except:
+                print(f"Error loading stop_sequences from config file. Using default value. ({stop_sequences})", tag='Warning', tag_color='yellow')
     except:
         print(f"Error loading config file ({CONFIG}). Make sure it's set in the .env file. Using default values.", tag='Warning', tag_color='yellow')
-    return model, system_instructions, safety, timeout, project_dir, ignored_extensions
+    return model, system_instructions, safety, timeout, project_dir, ignored_extensions, temperature, max_output_tokens, stop_sequences
 
 def get_context_token_count():
     """Get the total number of tokens in the context.
@@ -185,7 +207,7 @@ def calculate_cost(tokens, pricing, history=False):
     else: 
         return million_tokens * pricing['over_128k'] # Calculate cost using the higher tier pricing
 
-def initialize_chat(model_name, instructions, safety = MEDIUM_SAFETY,):
+def initialize_chat(model_name, instructions, safety, temperature, max_output_tokens, stop_sequences):
     """Initialize the chat session with the Gemini model.
 
     Args:
@@ -201,11 +223,9 @@ def initialize_chat(model_name, instructions, safety = MEDIUM_SAFETY,):
     
     genai.configure(api_key=API_KEY) # Configure the API key
     config = { # TODO - Update the generation config as needed
-        "temperature": 1,
-        "top_p": 0.95,
-        "top_k": 64,
-        "max_output_tokens": 8192,
-        "response_mime_type": "text/plain"
+        "temperature": temperature,
+        "max_output_tokens": max_output_tokens,
+        "stop_sequences": stop_sequences
     }
 
     model = genai.GenerativeModel(model_name = model_name, generation_config=config, safety_settings=safety, system_instruction=instructions) # Initialize the GenerativeModel
@@ -228,30 +248,34 @@ def add_message(role, content, tokens):
     _all_messages.append({'role': role, 'content': content, 'tokens': tokens, 'cost': cost})
     _messages.append({'role': role, 'content': content, 'tokens': tokens, 'cost': cost})
 
-def delete_messages(chat, msg_indicies):
+def delete_messages(chat, msg_indices):
     """Delete messages from the chat history.
 
     Args:
         chat (genai.ChatSession): The chat session object.
         msg_indicies (list): A list of message indicies to delete.
-        previous_input_tokens (int): The number of input tokens used before deleting messages.
-    """
-    
-    print (chat.history) # TODO - Remove this line, verify chat history begins at index 0 while _messages is at index 1
 
-    for i in sorted(msg_indicies, reverse=True):
+    Returns:
+        None
+    """
+
+    for i in sorted(msg_indices, reverse=True):
+        if msg_indices == []:
+            print('No message indicies provided.', tag='Error', tag_color='red')
+            return
         try:
-            if i == 0:
+            if i == 0:  # Protect system instructions at index 0
                 print("Cannot delete system instructions.", tag='Error', tag_color='red')
                 continue
-            del chat.history[i-1] # TODO - Verify chat history begins at index 0 while _messages is at index 1
-            previous_input_tokens -= _messages[i]['tokens']
-            del _messages[i]
+            del _messages[i]  # Index 0 is the system instructions
+            del chat.history[i-1]  # index 0 is the first message stored in the chat history, system instructions are not stored in the chat history
             print(f"Deleted message at index {i}.", tag='Delete', tag_color='magenta', color='white')
         except IndexError:
             print(f"Invalid message index. Message index out of range. Enter between 0 and {len(_messages) - 1}.", tag='Error', tag_color='red')
         except ValueError:
             print('Invalid message index. Enter a valid integer.', tag='Error', tag_color='red')
+
+
 
 def add_files(project_dir, ignored_extensions): # TODO - Multimodal input
     """Add files to the context.
@@ -303,14 +327,32 @@ def add_files(project_dir, ignored_extensions): # TODO - Multimodal input
         context += '<none>\n' # Add a placeholder for no files selected
     else:
         context += '\n'
+    retry = 'c'
     for file_path in selected_files: # Loop through the selected files
         try:
             content = open(file_path, 'r').read() # Read the content of the file
-            context += f'{file_path}\n```{content}```\n' # Add the file path and content to the context string
+            context += f'{file_path}\n```\n{content}\n```\n' # Add the file path and content to the context string
         except:
             print(f'Error reading file: {file_path}', tag='Error', tag_color='red')
+            retry = input ('Would you like to reselect files or continue? (r/C): ').lower()
+            if retry == 'c':
+                continue
+            elif retry == 'r':
+                print('Reselecting files...\n', color='magenta')
+                return add_files(project_dir, ignored_extensions)
+            else:
+                print('Reselecting files...\n', color='magenta')
+                return add_files(project_dir, ignored_extensions)
+
+    if retry == 'r':
+        print('Reselecting files...\n', color='magenta')
+        return add_files(project_dir, ignored_extensions)
+    elif retry == 'c':
+        return context
+    else:
+        print('Reselecting files...\n', color='magenta')
+        return add_files(project_dir, ignored_extensions)
     
-    return context
 
 def send_message(chat, message, timeout):
     print("Waiting for response...\n", color='magenta') # Print waiting message
@@ -356,7 +398,7 @@ def main():
         quit()
 
     # Load the config file
-    model, system_instructions, safety, timeout, project_dir, ignored_extensions = load_config()
+    model, system_instructions, safety, timeout, project_dir, ignored_extensions, temperature, max_output_tokens, stop_sequences = load_config()
 
     # Load the safety settings
     match safety:
@@ -378,7 +420,7 @@ def main():
 
 
     # Initialize the Gemini chat session and get the number of tokens used in the system instructions
-    chat, si_tokens, model = initialize_chat(model, system_instructions, safety)
+    chat, si_tokens, model = initialize_chat(model, system_instructions, safety, temperature, max_output_tokens, stop_sequences)
 
     # Add the system instructions to the chat history
     add_message('System', system_instructions, si_tokens)
@@ -417,7 +459,7 @@ def main():
                 else:
                     context = add_files(project_dir, ignored_extensions)
 
-                message = context + input('Enter your message to be sent along with the files: ') # Get user input
+                message = context + "\nUser Input: " + input('Enter your message to be sent along with the files: ') # Get user input
                 try:
                     input_tokens, output_tokens, response = send_message(chat, message, timeout) # Send the message to the model
                 except Exception as e:
