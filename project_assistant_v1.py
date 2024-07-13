@@ -428,7 +428,7 @@ def send_message(chat, message, timeout):
 
     return input_tokens, output_tokens, response_msg
 
-def main(): # TODO: If the response fails, message is added but the model has no access to it. Need to fix this somehow.
+def main():
     """Main function."""
     # API Key warning
     print('Make sure to add the .env file to your .gitignore to keep your API key secure.', tag='CRITICAL', tag_color='red')
@@ -505,6 +505,8 @@ def main(): # TODO: If the response fails, message is added but the model has no
         user_input = input(f"\nType \033[36m'help'\033[0m for special commands.\n\033[32mYou: ")
         print()
 
+        message = None  # Reset message to None for each iteration
+
         match user_input:
             case 'exit': # Exit chat session, give user option to save chat history
                 s = input('Do you want to save the chat history? (y/N): ').lower() # Ask user if they want to save chat history
@@ -523,34 +525,9 @@ def main(): # TODO: If the response fails, message is added but the model has no
                     print('Project directory not set in config file. Cannot add files.', tag='Error', tag_color='red')
                 else:
                     context = add_files(project_dir, ignored_extensions)
-
-                message = context + "\nUser Input: " + input('Enter your message to be sent along with the files: ') # Get user input
-                if DEBUG:
-                    print(message, tag='DEBUG', tag_color='yellow', color='white')
-                try:
-                    input_tokens, output_tokens, response = send_message(chat, message, timeout) # Send the message to the model
-                except Exception as e:
-                    tokens = model.count_tokens([{'role': 'user', 'parts':[message]}]).total_tokens - si_tokens
-                    total_input_tokens += tokens
-                    add_message('User', message, tokens) # Add the user message to the chat history
-                    print(message, tag='You', tag_color='green') # Print the user's message
-                    continue
-
-                # Add the number of tokens used in this message to the total token counts
-                total_input_tokens += input_tokens
-                total_output_tokens += output_tokens
-
-                add_message('User', message, model.count_tokens([{'role': 'user', 'parts':[message]}]).total_tokens - si_tokens) # Add the user message to the chat history
-                print(message+'\n', tag='You', tag_color='green') # Print the user's message
-
-                add_message('Model', response, model.count_tokens([{'role': 'model', 'parts':[response]}]).total_tokens - si_tokens) # Add the model response to the chat history
-                print(response, tag='Model', tag_color='blue') # Print the model's response
-                
-                # Print the number of input and output tokens used and the costs
-                print(f'Tokens: {input_tokens}, Cost: ${calculate_cost(input_tokens, INPUT_PRICING):.5f}', tag='Input', tag_color='magenta', color='white') # Print the number of input tokens used and the cost
-                print(f'Tokens: {output_tokens}, Cost: ${calculate_cost(output_tokens, OUTPUT_PRICING):.5f}', tag='Output', tag_color='magenta', color='white') # Print the number of output tokens used and the cost
-                session_cost = calculate_cost(total_input_tokens, INPUT_PRICING) + calculate_cost(total_output_tokens, OUTPUT_PRICING)
-                print(f'${session_cost:.5f}', tag='Session Cost', tag_color='magenta', color='white') # Print the total cost of the session
+                    message = context + "\nUser Input: " + input('Enter your message to be sent along with the files: ') # Get user input
+                    if DEBUG:
+                        print(message, tag='DEBUG', tag_color='yellow', color='white')
             case 'history': # Display chat history
                 print(tag='Chat History', tag_color='magenta')
                 for i, m in enumerate(_messages): # Loop through messages in chat history
@@ -586,31 +563,34 @@ def main(): # TODO: If the response fails, message is added but the model has no
             case 'help': # Display help message
                 print(HELP_MSG, tag='Help', tag_color='cyan')
             case _: # Send user input to the model
-                try:
-                    input_tokens, output_tokens, response = send_message(chat, user_input, timeout) # Send the message to the model
-                except Exception as e:
-                    tokens = model.count_tokens([{'role': 'user', 'parts':[user_input]}]).total_tokens - si_tokens
-                    total_input_tokens += tokens
-                    add_message('User', user_input, tokens) # Add the user message to the chat history
-                    print(user_input+'\n', tag='You', tag_color='green') # Print the user's message
-                    continue
+                message = user_input 
 
-                # Add the number of tokens used in this message to the total token counts
-                total_input_tokens += input_tokens
-                total_output_tokens += output_tokens
+        # Process the message if it's not a command or 'files' command set a message       
+        if message: # TODO: If the response fails, message is added but the model has no access to it. Need to fix this somehow.
+            try:
+                input_tokens, output_tokens, response = send_message(chat, message, timeout) # Send the message to the model
+            except Exception as e:
+                tokens = model.count_tokens([{'role': 'user', 'parts':[message]}]).total_tokens - si_tokens
+                total_input_tokens += tokens
+                add_message('User', message, tokens) # Add the user message to the chat history
+                print(message, tag='You', tag_color='green') # Print the user's message
+                continue
 
-                add_message('User', user_input, model.count_tokens([{'role': 'user', 'parts':[user_input]}]).total_tokens - si_tokens) # Add the user message to the chat history
-                print(user_input+'\n', tag='You', tag_color='green') # Print the user's message
+            # Add the number of tokens used in this message to the total token counts
+            total_input_tokens += input_tokens
+            total_output_tokens += output_tokens
 
-                add_message('Model', response, model.count_tokens([{'role': 'model', 'parts':[response]}]).total_tokens - si_tokens) # Add the model response to the chat history
-                print(response, tag='Model', tag_color='blue') # Print the model's response
-                
-                # Print the number of input and output tokens used and the costs
-                print(f'Tokens: {input_tokens}, Cost: ${calculate_cost(input_tokens, INPUT_PRICING):.5f}', tag='Input', tag_color='magenta', color='white') # Print the number of input tokens used and the cost
-                print(f'Tokens: {output_tokens}, Cost: ${calculate_cost(output_tokens, OUTPUT_PRICING):.5f}', tag='Output', tag_color='magenta', color='white') # Print the number of output tokens used and the cost
-                session_cost = calculate_cost(total_input_tokens, INPUT_PRICING) + calculate_cost(total_output_tokens, OUTPUT_PRICING)
-                print(f'${session_cost:.5f}', tag='Session Cost', tag_color='magenta', color='white') # Print the total cost of the session
+            add_message('User', message, model.count_tokens([{'role': 'user', 'parts':[message]}]).total_tokens - si_tokens) # Add the user message to the chat history
+            print(message+'\n', tag='You', tag_color='green') # Print the user's message
 
+            add_message('Model', response, model.count_tokens([{'role': 'model', 'parts':[response]}]).total_tokens - si_tokens) # Add the model response to the chat history
+            print(response, tag='Model', tag_color='blue') # Print the model's response
+            
+            # Print the number of input and output tokens used and the costs
+            print(f'Tokens: {input_tokens}, Cost: ${calculate_cost(input_tokens, INPUT_PRICING):.5f}', tag='Input', tag_color='magenta', color='white') # Print the number of input tokens used and the cost
+            print(f'Tokens: {output_tokens}, Cost: ${calculate_cost(output_tokens, OUTPUT_PRICING):.5f}', tag='Output', tag_color='magenta', color='white') # Print the number of output tokens used and the cost
+            session_cost = calculate_cost(total_input_tokens, INPUT_PRICING) + calculate_cost(total_output_tokens, OUTPUT_PRICING)
+            print(f'${session_cost:.5f}', tag='Session Cost', tag_color='magenta', color='white') # Print the total cost of the session
 
 if __name__ == '__main__':
     main()
