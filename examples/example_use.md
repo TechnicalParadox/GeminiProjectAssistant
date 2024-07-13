@@ -81,7 +81,7 @@ from print_color import print
 *... deleted content to save space in example*
 ```
 
-User Input: I'll attach the output of our current conversation, pasted as one line, so please excuse the formatting: [CRITICAL] Make sure to add the .env file to your .gitignore to keep your API key secure.[Welcome to Gemini Project Assistant v1!] - Converse with the LLM model to get help with your project. Ex. 'Help me debug this script.', 'Complete the TODOs in this file.', 'What can I add to improve this project?', etc.- Cost will be shown for each message and the ... Deleted content to save space in the example
+User Input: I'll attach the output of our current conversation, pasted as one line, so please excuse the formatting: [CRITICAL] Make sure to add the .env file to your .gitignore to keep your API key secure.[Welcome to Gemini Project Assistant v1!] - Converse with the LLM model to get help with your project. Ex. 'Help me debug this script.', 'Complete the TODOs in this file.', 'What can I add to improve this project?', etc.- Cost will be shown for each message and the *... deleted content to save space in the example*
 
 ---
 ### 12. Model, 170 tokens
