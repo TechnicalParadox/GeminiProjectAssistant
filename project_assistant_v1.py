@@ -421,7 +421,7 @@ def send_message(chat, message, timeout):
         output_tokens = response.usage_metadata.candidates_token_count # Get the number of output tokens used
         response_msg = response.text # Get the response message
         if DEBUG:
-            print(response)
+            print(response, tag='DEBUG', tag_color='yellow')
     except Exception as e:
         print(e, tag='Response Error', tag_color='red')
         raise e # Raise the exception so the calling function can handle it
@@ -527,7 +527,7 @@ def main():
                     context = add_files(project_dir, ignored_extensions)
                     message = context + "\nUser Input: " + input('Enter your message to be sent along with the files: ') # Get user input
                     if DEBUG:
-                        print(message, tag='DEBUG', tag_color='yellow', color='white')
+                        print(message, tag='DEBUG', tag_color='yellow')
             case 'history': # Display chat history
                 print(tag='Chat History', tag_color='magenta')
                 for i, m in enumerate(_messages): # Loop through messages in chat history
