@@ -222,7 +222,7 @@ def initialize_chat(model_name, instructions, safety, temperature, max_output_to
     """
     
     genai.configure(api_key=API_KEY) # Configure the API key
-    config = { # TODO - Update the generation config as needed
+    config = {
         "temperature": temperature,
         "max_output_tokens": max_output_tokens,
         "stop_sequences": stop_sequences
@@ -275,7 +275,32 @@ def delete_messages(chat, msg_indices):
         except ValueError:
             print('Invalid message index. Enter a valid integer.', tag='Error', tag_color='red')
 
+def save_chat_history(history):
+    """Save the chat history to a file, with total cost of session at the start of the file.
 
+    Args:
+        history (list): The chat history to save.
+
+    Returns:
+        None
+    """
+    
+    while True:
+        filetype = input('Enter the format you wish to save the chat history in (text, json, or csv): ').lower() # Get the file format from the user
+        if filetype not in ['json', 'text', 'csv']: # Check if the file format is valid
+            print('Invalid file format. Enter "text", "json", or "csv".', tag='Error', tag_color='red')
+            continue
+        filename = input('Enter the filename (no extension) to save the chat history to (This will save in your current directory): ') # Get the filename from the user
+        match filetype:
+            case 'json': # Save chat history as JSON
+                with open(filename + '.json', 'w') as f:
+                    pass
+            case 'text': # Save chat history as text, formatted for easy reading
+                with open(filename + '.txt', 'w') as f:
+                    pass
+            case 'markdown': # Save chat history as csv
+                with open(filename + '.csv', 'w') as f:
+                    pass
 
 def add_files(project_dir, ignored_extensions): # TODO - Multimodal input
     """Add files to the context.
@@ -353,7 +378,6 @@ def add_files(project_dir, ignored_extensions): # TODO - Multimodal input
         print('Reselecting files...\n', color='magenta')
         return add_files(project_dir, ignored_extensions)
     
-
 def send_message(chat, message, timeout):
     print("Waiting for response...\n", color='magenta') # Print waiting message
     try:
@@ -369,7 +393,7 @@ def send_message(chat, message, timeout):
 
     return input_tokens, output_tokens, response_msg
 
-def main():
+def main(): # TODO: If the response fails, message is added but the model has no access to it. Need to fix this somehow.
     """Main function."""
     # API Key warning
     print('Make sure to add the .env file to your .gitignore to keep your API key secure.', tag='CRITICAL', tag_color='red')
@@ -448,7 +472,15 @@ def main():
 
         match user_input:
             case 'exit': # Exit chat session, give user option to save chat history
-                pass
+                save = input('Do you want to save the chat history? (y/N): ').lower() # Ask user if they want to save chat history
+                if save != 'n' or save != 'no':
+                    full = input('Do you want to save the full chat history, or exclude the messages you deleted? (f/E): ').lower() # Ask user if they want to save the full chat history
+                    if full == 'e' or full == 'exclude': # Save chat history excluding deleted messages
+                        print('Saving chat history excluding deleted messages...', color='magenta')
+                        save_chat_history(_messages)
+                    else: # Save full chat history
+                        print('Saving full chat history...', color='magenta')
+                        save_chat_history(_all_messages)
             case 'delete': # Delete messages from history
                 msg_indicies_str = input('Enter the message indicies to delete (comma-separated):') # Get message indicies from user
                 msg_indicies = [int(x.strip()) for x in msg_indicies_str.split(',')] # Convert message indicies to integers
@@ -460,6 +492,8 @@ def main():
                     context = add_files(project_dir, ignored_extensions)
 
                 message = context + "\nUser Input: " + input('Enter your message to be sent along with the files: ') # Get user input
+                if DEBUG:
+                    print(message, tag='DEBUG', tag_color='yellow', color='white')
                 try:
                     input_tokens, output_tokens, response = send_message(chat, message, timeout) # Send the message to the model
                 except Exception as e:
@@ -484,8 +518,6 @@ def main():
                 print(f'Tokens: {output_tokens}, Cost: ${calculate_cost(output_tokens, OUTPUT_PRICING):.5f}', tag='Output', tag_color='magenta', color='white') # Print the number of output tokens used and the cost
                 session_cost = calculate_cost(total_input_tokens, INPUT_PRICING) + calculate_cost(total_output_tokens, OUTPUT_PRICING)
                 print(f'${session_cost:.5f}', tag='Session Cost', tag_color='magenta', color='white') # Print the total cost of the session
-
-
             case 'history': # Display chat history
                 print(tag='Chat History', tag_color='magenta')
                 for i, m in enumerate(_messages): # Loop through messages in chat history
