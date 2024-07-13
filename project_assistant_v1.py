@@ -424,7 +424,7 @@ def send_message(chat, message, timeout):
             print(response)
     except Exception as e:
         print(e, tag='Response Error', tag_color='red')
-
+        raise e # Raise the exception so the calling function can handle it
 
     return input_tokens, output_tokens, response_msg
 
