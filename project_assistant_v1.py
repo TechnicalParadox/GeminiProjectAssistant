@@ -411,6 +411,9 @@ def add_files(project_dir, ignored_extensions): # TODO - Multimodal input
             if not any(file.endswith(ext) for ext in ignored_extensions) and not file.startswith('.'): # Check if the file extension is not in the ignored extensions list
                 all_files.append(os.path.join(root, file)) # Add the file to the selected files list
     
+    if all_files == []: # Check if no files were found
+        print(f'No files found in the project directory. Check the path ({project_dir})', tag='Error', tag_color='red')
+    
     # Print the list of files in the project directory
     for i, file in enumerate(all_files):
         print(file, tag=str(i+1), tag_color='magenta', color='white')
