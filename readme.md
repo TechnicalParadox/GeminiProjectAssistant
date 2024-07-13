@@ -48,4 +48,5 @@ Any questions should be directed to
 [giamolao98@gmail.com](mailto:technicalparadox.github.io)
 
 *This readme was generated using [readme-js](https://github.com/TechnicalParadox/readme-js)*
+
 *Readme improvements and edits by [GeminiProjectAssistant](https://github.com/TechnicalParadox/GeminiProjectAssistant)*
