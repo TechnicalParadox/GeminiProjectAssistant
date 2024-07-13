@@ -4,7 +4,10 @@ import json # For JSON operations
 import google.generativeai as genai # Import the Google Generative AI library
 from dotenv import load_dotenv # For loading environment variables from .env file
 from google.generativeai.types import HarmCategory, HarmBlockThreshold # For configuring the safety settings
+from google.api_core.exceptions import DeadlineExceeded # For handling deadline exceeded errors
 from print_color import print
+
+DEBUG = False
 
 # Load the environment variables from the .env file
 load_dotenv()
@@ -105,12 +108,14 @@ def load_config():
         str: The safety settings to use.
         int: The timeout setting to use.
         str: The project directory to use.
+        list: A list of file extensions to ignore in the project directory.
     """
     model = 'gemini-1.5-pro-latest'
-    system_instructions = "You are an expert developer. Assist the user with their needs. Ask questions to clarify the user's requirements. Provide detailed and helpful responses." # default
+    system_instructions = "You are an expert developer. Assist the user with their needs. Ask questions to clarify the user's requirements. Provide detailed and helpful responses. Refrain from using emojis." # default
     safety = 'medium' # default
     timeout = 60 # default
     project_dir = None # default
+    ignored_extensions = ['.gitignore'] # default
     # Load configuration from file
     try:
         with open(CONFIG, 'r') as f:
@@ -140,9 +145,14 @@ def load_config():
                 project_dir = config['project_directory']
             except:
                 print(f"Error loading project directory from config file, this will severely limit usefullness of this application.", tag='Critical', tag_color='red')
+            # Load ignored extensions
+            try:
+                ignored_extensions = config['ignored_extensions']
+            except:
+                print("Error loading ignored extensions from config file. Using default ignored extensions.", tag='Warning', tag_color='yellow')
     except:
         print(f"Error loading config file ({CONFIG}). Make sure it's set in the .env file. Using default values.", tag='Warning', tag_color='yellow')
-    return model, system_instructions, safety, timeout, project_dir
+    return model, system_instructions, safety, timeout, project_dir, ignored_extensions
 
 def get_context_token_count():
     """Get the total number of tokens in the context.
@@ -186,13 +196,22 @@ def initialize_chat(model_name, instructions, safety = MEDIUM_SAFETY,):
     Returns:
         genai.ChatSession: The chat session object.
         int: The number of tokens used in the system instructions.
+        model: The GenerativeModel object.
     """
     
     genai.configure(api_key=API_KEY) # Configure the API key
-    model = genai.GenerativeModel(model_name = model_name, safety_settings=safety, system_instruction=instructions) # Initialize the GenerativeModel
+    config = { # TODO - Update the generation config as needed
+        "temperature": 1,
+        "top_p": 0.95,
+        "top_k": 64,
+        "max_output_tokens": 8192,
+        "response_mime_type": "text/plain"
+    }
+
+    model = genai.GenerativeModel(model_name = model_name, generation_config=config, safety_settings=safety, system_instruction=instructions) # Initialize the GenerativeModel
 
     # Return the chat session and the number of tokens used in the system instructions
-    return model.start_chat(), model.count_tokens(" ").total_tokens
+    return model.start_chat(), model.count_tokens(" ").total_tokens, model
 
 def add_message(role, content, tokens):
     """Add a message to the history lists.
@@ -215,9 +234,7 @@ def delete_messages(chat, msg_indicies):
     Args:
         chat (genai.ChatSession): The chat session object.
         msg_indicies (list): A list of message indicies to delete.
-    
-    Returns:
-        None
+        previous_input_tokens (int): The number of input tokens used before deleting messages.
     """
     
     print (chat.history) # TODO - Remove this line, verify chat history begins at index 0 while _messages is at index 1
@@ -228,12 +245,87 @@ def delete_messages(chat, msg_indicies):
                 print("Cannot delete system instructions.", tag='Error', tag_color='red')
                 continue
             del chat.history[i-1] # TODO - Verify chat history begins at index 0 while _messages is at index 1
+            previous_input_tokens -= _messages[i]['tokens']
             del _messages[i]
             print(f"Deleted message at index {i}.", tag='Delete', tag_color='magenta', color='white')
         except IndexError:
             print(f"Invalid message index. Message index out of range. Enter between 0 and {len(_messages) - 1}.", tag='Error', tag_color='red')
         except ValueError:
             print('Invalid message index. Enter a valid integer.', tag='Error', tag_color='red')
+
+def add_files(project_dir, ignored_extensions): # TODO - Multimodal input
+    """Add files to the context.
+    
+    Args:
+        project_dir (str): The project directory to use.
+        ignored_extensions (list): A list of file extensions to ignore.
+
+    Returns:
+        str: The context string with the files and content provided.
+    """
+    all_files = [] # Initialize list to store all file paths in the project directory
+    selected_files = [] # Initialize list to store selected file paths
+
+    # Walk through the project directory and add all files to the all_files list
+    for root, dirs, files in os.walk(project_dir):
+        dirs[:] = [d for d in dirs if not d.startswith('.')] # Ignore hidden directories
+        for file in files:
+            if not any(file.endswith(ext) for ext in ignored_extensions) and not file.startswith('.'): # Check if the file extension is not in the ignored extensions list
+                all_files.append(os.path.join(root, file)) # Add the file to the selected files list
+    
+    # Print the list of files in the project directory
+    for i, file in enumerate(all_files):
+        print(file, tag=str(i+1), tag_color='magenta', color='white')
+    
+    while True: # Loop until the user selects files or cancels
+        choices = input('Enter file numbers, extensions (e.g. ".py", ".txt", etc.), "all", or "none" (comma-separated): ') # Get user input for file selection
+        choices = [choice.strip() for choice in choices.split(',')] # Split user input by commas and remove whitespace
+
+        try: # Attempt to process user input
+            for choice in choices: # Iterate through each choice
+                if choice.lower() == 'all': # Select all files
+                    selected_files = all_files
+                    break # Exit the loop after selecting all
+                elif choice.lower() == 'none': # Select no files
+                    break # Exit the loop after selecting none
+                elif choice.startswith('.'): # Choice is a file extension
+                    selected_files.extend([file for file in all_files if file.endswith(choice)]) # Add files with the specified extension to the selected files list
+                else: # Choice is assuemd to be a file number
+                    selected_files.append(all_files[int(choice) - 1]) # Add the file to the selected files list
+            break # Exit the loop after processing all choices
+        except ValueError:
+            print('Invalid input. Enter a valid file number, extension, "all", or "none".', tag='Error', tag_color='red')
+        except IndexError:
+            print(f'Invalid file number. Enter a number between 1 and {len(all_files)}.', tag='Error', tag_color='red')
+    
+    context = 'Files and content provided for context: ' # Initialize the context string
+    if selected_files == []:
+        context += '<none>\n' # Add a placeholder for no files selected
+    else:
+        context += '\n'
+    for file_path in selected_files: # Loop through the selected files
+        try:
+            content = open(file_path, 'r').read() # Read the content of the file
+            context += f'{file_path}\n```{content}```\n' # Add the file path and content to the context string
+        except:
+            print(f'Error reading file: {file_path}', tag='Error', tag_color='red')
+    
+    return context
+
+def send_message(chat, message, timeout):
+    print("Waiting for response...\n", color='magenta') # Print waiting message
+    try:
+        response = chat.send_message(message, request_options={'timeout': timeout}) # Send the message to the model
+        input_tokens = response.usage_metadata.prompt_token_count # Get the number of input tokens used
+        output_tokens = response.usage_metadata.candidates_token_count # Get the number of output tokens used
+        response_msg = response.text # Get the response message
+        if DEBUG:
+            print(response)
+    except Exception as e:
+        print(e, tag='Response Error', tag_color='red')
+
+
+    return input_tokens, output_tokens, response_msg
 
 def main():
     """Main function."""
@@ -264,7 +356,7 @@ def main():
         quit()
 
     # Load the config file
-    model, system_instructions, safety, timeout, project_dir = load_config()
+    model, system_instructions, safety, timeout, project_dir, ignored_extensions = load_config()
 
     # Load the safety settings
     match safety:
@@ -286,7 +378,7 @@ def main():
 
 
     # Initialize the Gemini chat session and get the number of tokens used in the system instructions
-    chat, si_tokens = initialize_chat(model, system_instructions, safety)
+    chat, si_tokens, model = initialize_chat(model, system_instructions, safety)
 
     # Add the system instructions to the chat history
     add_message('System', system_instructions, si_tokens)
@@ -302,7 +394,7 @@ def main():
     # Initialize variables
     total_input_tokens = 0
     total_output_tokens = 0
-    previous_input_tokens = si_tokens
+    session_cost = 0
 
     print('Starting chat session...', tag='Chat Session', tag_color='magenta', color='white')
 
@@ -316,11 +408,42 @@ def main():
             case 'exit': # Exit chat session, give user option to save chat history
                 pass
             case 'delete': # Delete messages from history
-                msg_indicies_str = input('Enter the message indicies to delete (comma-separated): ') # Get message indicies from user
+                msg_indicies_str = input('Enter the message indicies to delete (comma-separated):') # Get message indicies from user
                 msg_indicies = [int(x.strip()) for x in msg_indicies_str.split(',')] # Convert message indicies to integers
                 delete_messages(chat, msg_indicies) # Delete messages from chat history
             case 'files': # Add files to context
-                pass
+                if project_dir is None:
+                    print('Project directory not set in config file. Cannot add files.', tag='Error', tag_color='red')
+                else:
+                    context = add_files(project_dir, ignored_extensions)
+
+                message = context + input('Enter your message to be sent along with the files: ') # Get user input
+                try:
+                    input_tokens, output_tokens, response = send_message(chat, message, timeout) # Send the message to the model
+                except Exception as e:
+                    tokens = model.count_tokens(message).total_tokens - si_tokens
+                    total_input_tokens += tokens
+                    add_message('User', message, tokens) # Add the user message to the chat history
+                    print(message, tag='You', tag_color='green') # Print the user's message
+                    continue
+
+                # Add the number of tokens used in this message to the total token counts
+                total_input_tokens += input_tokens
+                total_output_tokens += output_tokens
+
+                add_message('User', message, model.count_tokens(message).total_tokens - si_tokens) # Add the user message to the chat history
+                print(message+'\n', tag='You', tag_color='green') # Print the user's message
+
+                add_message('Model', response, output_tokens) # Add the model response to the chat history
+                print(response, tag='Model', tag_color='blue') # Print the model's response
+                
+                # Print the number of input and output tokens used and the costs
+                print(f'Tokens: {input_tokens}, Cost: ${calculate_cost(input_tokens, INPUT_PRICING):.5f}', tag='Input', tag_color='magenta', color='white') # Print the number of input tokens used and the cost
+                print(f'Tokens: {output_tokens}, Cost: ${calculate_cost(output_tokens, OUTPUT_PRICING):.5f}', tag='Output', tag_color='magenta', color='white') # Print the number of output tokens used and the cost
+                session_cost = calculate_cost(total_input_tokens, INPUT_PRICING) + calculate_cost(total_output_tokens, OUTPUT_PRICING)
+                print(f'${session_cost:.5f}', tag='Session Cost', tag_color='magenta', color='white') # Print the total cost of the session
+
+
             case 'history': # Display chat history
                 print(tag='Chat History', tag_color='magenta')
                 for i, m in enumerate(_messages): # Loop through messages in chat history
@@ -330,13 +453,13 @@ def main():
                     cost_to_keep = calculate_cost(m['tokens'], INPUT_PRICING, history=True) # Calculate cost to keep message
                     match m['role']:
                         case 'System':
-                            print(f'{i}. Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}')
+                            print(f'Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}', tag=str(i), tag_color='magenta', color='white')
                             print(content_preview, tag='System', tag_color='magenta')
                         case 'User':
-                            print(f'{i}. Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}')
+                            print(f'Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}', tag=str(i), tag_color='magenta', color='white')
                             print(content_preview, tag='User', tag_color='green')
                         case 'Model':
-                            print(f'{i}. Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}')
+                            print(f'Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}', tag=str(i), tag_color='magenta', color='white')
                             print(content_preview, tag='Model', tag_color='blue')
             case 'view': # View a full message's content
                 message_index = input('Enter the message index to view: ') # Get message index from user
@@ -355,7 +478,30 @@ def main():
             case 'help': # Display help message
                 print(HELP_MSG, tag='Help', tag_color='cyan')
             case _: # Send user input to the model
-                pass
+                try:
+                    input_tokens, output_tokens, response = send_message(chat, user_input, timeout) # Send the message to the model
+                except Exception as e:
+                    tokens = model.count_tokens(user_input).total_tokens - si_tokens
+                    total_input_tokens += tokens
+                    add_message('User', user_input, tokens) # Add the user message to the chat history
+                    print(user_input+'\n', tag='You', tag_color='green') # Print the user's message
+                    continue
+
+                # Add the number of tokens used in this message to the total token counts
+                total_input_tokens += input_tokens
+                total_output_tokens += output_tokens
+
+                add_message('User', user_input, model.count_tokens(user_input).total_tokens - si_tokens) # Add the user message to the chat history
+                print(user_input+'\n', tag='You', tag_color='green') # Print the user's message
+
+                add_message('Model', response, output_tokens) # Add the model response to the chat history
+                print(response, tag='Model', tag_color='blue') # Print the model's response
+                
+                # Print the number of input and output tokens used and the costs
+                print(f'Tokens: {input_tokens}, Cost: ${calculate_cost(input_tokens, INPUT_PRICING):.5f}', tag='Input', tag_color='magenta', color='white') # Print the number of input tokens used and the cost
+                print(f'Tokens: {output_tokens}, Cost: ${calculate_cost(output_tokens, OUTPUT_PRICING):.5f}', tag='Output', tag_color='magenta', color='white') # Print the number of output tokens used and the cost
+                session_cost = calculate_cost(total_input_tokens, INPUT_PRICING) + calculate_cost(total_output_tokens, OUTPUT_PRICING)
+                print(f'${session_cost:.5f}', tag='Session Cost', tag_color='magenta', color='white') # Print the total cost of the session
 
 
 if __name__ == '__main__':
