@@ -14,7 +14,6 @@ load_dotenv()
 
 # Load the environment variables
 API_KEY = os.getenv('API_KEY') # The API key
-CONFIG = os.getenv('CONFIG') # The config file
 
 # Gemini Safety Settings - for more info visit https://ai.google.dev/gemini-api/docs/safety-settings
 #  No safety settings
@@ -114,6 +113,9 @@ def load_config():
         int: The maxOutputTokens setting to use.
         list: A list of stop sequences to use.
     """
+    script_dir = os.path.dirname(__file__) # Get the directory of the script
+    config_file = os.path.join(script_dir, 'config.json') # Set the path to the config file
+
     model = 'gemini-1.5-pro-latest'
     system_instructions = "You are an expert developer. Assist the user with their needs. Ask questions to clarify the user's requirements. Provide detailed and helpful responses. Refrain from using emojis." # default
     safety = 'medium' # default
@@ -126,7 +128,7 @@ def load_config():
 
     # Load configuration from file
     try:
-        with open(CONFIG, 'r') as f:
+        with open(config_file, 'r') as f:
             config = json.load(f)
             # Load model
             try:
@@ -174,7 +176,7 @@ def load_config():
             except:
                 print(f"Error loading stop_sequences from config file. Using default value. ({stop_sequences})", tag='Warning', tag_color='yellow')
     except:
-        print(f"Error loading config file ({CONFIG}). Make sure it's set in the .env file. Using default values.", tag='Warning', tag_color='yellow')
+        print(f"Error loading config file ({config_file}). Make sure it exists in same director as {os.path.basename(__file__)}. Using default values.", tag='Warning', tag_color='yellow')
     return model, system_instructions, safety, timeout, project_dir, ignored_extensions, temperature, max_output_tokens, stop_sequences
 
 def get_context_token_count():
@@ -432,7 +434,7 @@ def send_message(chat, message, timeout):
 def main():
     """Main function."""
     # API Key warning
-    print('Make sure to add the .env file to your .gitignore to keep your API key secure.', tag='CRITICAL', tag_color='red')
+    print('Make sure to add the .env file to your .gitignore to keep your API key secure.', tag='Critical', tag_color='red')
 
     # Print instructions
     print(INSTRUCTIONS, tag='Welcome to Gemini Project Assistant v1!', tag_color='cyan')
@@ -444,20 +446,29 @@ def main():
     print(f"\nInput: {INPUT_PRICING['upto_128k']} (up to 128k tokens), {INPUT_PRICING['over_128k']} (over 128k tokens)\nOutput: {OUTPUT_PRICING['upto_128k']} (up to 128k tokens), {OUTPUT_PRICING['over_128k']} (over 128k tokens)", tag=f'PRICING for {PRICING_MODEL} ($ per 1 million tokens) as of {PRICING_DATE}', tag_color='magenta')
 
     # User agreement
-    print('By continuing, you take full responsibility for your use of this application.', tag='User Agreement', tag_color='red')
+    print('By continuing, you take full responsibility for your use of this application.', tag='User Agreement', tag_color='cyan')
     accept = input('Do you accept the terms and conditions? (y/N): ')
     if (accept.lower() != 'y'): # Exit if user does not accept
         print('Exiting...', tag_color='red')
         quit()
     print('Continuing...\n', color='green')
 
-    # Verify environment variables are set
-    if (not API_KEY or  not CONFIG):
+    # Verify environment variables are set # TODO: Manually enter API key if no .env is found
+    global API_KEY
+    if (not API_KEY):
         # Exit if not set
         print("Set your .env as specified in the .env-template", tag='Error', tag_color='red')
-        quit()
+        if input('Would you like to manually enter your API key? (y/N): ').lower() == 'y':
+            API_KEY = input('Enter your API key (https://aistudio.google.com/app/apikey): ')
+            if not API_KEY:
+                print('API key not set. Exiting...', tag='Error', tag_color='red')
+                quit
+            else:
+                print('Be sure not to accidentally copy/share your API key from the terminal.', tag='Critical', tag_color='red')
+        else:
+            quit()
 
-    # Load the config file
+    # Load the config file # TODO: If no config file is found, generate one with defaults and user input
     model, system_instructions, safety, timeout, project_dir, ignored_extensions, temperature, max_output_tokens, stop_sequences = load_config()
 
     # Load the safety settings
