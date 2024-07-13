@@ -257,7 +257,7 @@ def delete_messages(chat, msg_indices):
         msg_indicies (list): A list of message indicies to delete.
 
     Returns:
-        None
+        (float): The new base input cost for the chat history.
     """
 
     for i in sorted(msg_indices, reverse=True):
@@ -275,6 +275,8 @@ def delete_messages(chat, msg_indices):
             print(f"Invalid message index. Message index out of range. Enter between 0 and {len(_messages) - 1}.", tag='Error', tag_color='red')
         except ValueError:
             print('Invalid message index. Enter a valid integer.', tag='Error', tag_color='red')
+
+    return sum(m['cost'] for m in _messages)
 
 def save(session_cost):
     full = input('Do you want to save the full chat history, or exclude the messages you deleted? (f/E): ').lower() # Ask user if they want to save the full chat history
@@ -514,7 +516,8 @@ def main(): # TODO: If the response fails, message is added but the model has no
             case 'delete': # Delete messages from history
                 msg_indicies_str = input('Enter the message indicies to delete (comma-separated):') # Get message indicies from user
                 msg_indicies = [int(x.strip()) for x in msg_indicies_str.split(',')] # Convert message indicies to integers
-                delete_messages(chat, msg_indicies) # Delete messages from chat history
+                new_cost = delete_messages(chat, msg_indicies) # Delete messages from chat history
+                print(f'New history base input cost: ${new_cost:.5f}', tag='New Cost', tag_color='magenta', color='white') # Print the new base input cost
             case 'files': # Add files to context
                 if project_dir is None:
                     print('Project directory not set in config file. Cannot add files.', tag='Error', tag_color='red')
@@ -565,6 +568,7 @@ def main(): # TODO: If the response fails, message is added but the model has no
                         case 'Model':
                             print(f'Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}', tag=str(i), tag_color='magenta', color='white')
                             print(content_preview, tag='Model', tag_color='blue')
+                print(f'History base input cost: ${sum(m['cost'] for m in _messages):.5f}', tag='Input Cost', tag_color='magenta', color='white') # Print the history base input cost
             case 'view': # View a full message's content
                 message_index = input('Enter the message index to view: ') # Get message index from user
                 try:
