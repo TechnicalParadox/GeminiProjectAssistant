@@ -1,4 +1,4 @@
-# *This is an example of a saved chat log using the application*
+# *This is an example of a saved chat log using the application, you can save as text, markdown, json, or csv*
 
 # Total session cost: $0.22407
 
