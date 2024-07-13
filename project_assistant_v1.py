@@ -263,20 +263,66 @@ def main():
     chat, si_tokens = initialize_chat(model, system_instructions, safety)
 
     # Add the system instructions to the chat history
-    _all_messages.append({'role': 'system','content': system_instructions, 'tokens': si_tokens})
+    add_message('System', system_instructions, si_tokens)
 
     # Print system instructions, token count and cost
     print(_all_messages[0]['content'], tag='System Instructions', tag_color='magenta', color='white')
     print(_all_messages[0]['tokens'], tag='Tokens', tag_color='magenta', color='white')
-    print(f'{calculate_cost(_all_messages[0]['tokens'], INPUT_PRICING):.5f}', tag='Cost', tag_color='magenta', color='white')
+    print(f'${calculate_cost(_all_messages[0]['tokens'], INPUT_PRICING):.5f}', tag='Cost', tag_color='magenta', color='white')
 
     # Display help message
     display_help()
 
+    # Initialize variables
+    total_input_tokens = 0
+    total_output_tokens = 0
+    previous_input_tokens = si_tokens
+
+    print('Starting chat session...', tag='Chat Session', tag_color='magenta', color='white')
+
     # Main chat loop
     while True:
+        # Get user input
         user_input = input(f"\nType \033[36m'help'\033[0m for special commands.\n\033[32mYou: ")
-    
+        print()
+
+        match user_input:
+            case 'exit':
+                pass
+            case 'delete':
+                pass
+            case 'files':
+                pass
+            case 'history': # Display chat history
+                print(tag='Chat History', tag_color='magenta')
+                for i, m in enumerate(_messages): # Loop through messages in chat history
+                    # Calculate message content preview, removing newlines
+                    content_preview = m['content'][:75] + ' ... ' + m['content'][-75:] if len(m['content']) > 150 else m['content']
+                    content_preview = content_preview.replace('\n', ' ')
+                    cost_to_keep = calculate_cost(m['tokens'], INPUT_PRICING, history=True) # Calculate cost to keep message
+                    match m['role']:
+                        case 'System':
+                            print(f'{i}. Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}')
+                            print(content_preview, tag='System', tag_color='magenta')
+                        case 'User':
+                            print(f'{i}. Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}')
+                            print(content_preview, tag='User', tag_color='green')
+                        case 'Model':
+                            print(f'{i}. Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}')
+                            print(content_preview, tag='Model', tag_color='blue')
+            case 'view': # View a full message's content
+                message_index = input('Enter the message index to view: ') # Get message index from user
+                match _messages[int(message_index)]['role']: # Display and color message content based on role
+                    case 'System':
+                        print(_messages[int(message_index)]['content'], tag='System', tag_color='magenta')
+                    case 'User':
+                        print(_messages[int(message_index)]['content'], tag='User', tag_color='green')
+                    case 'Model':
+                        print(_messages[int(message_index)]['content'], tag='Model', tag_color='blue')
+            case 'help': # Display help message
+                print(HELP_MSG, tag='Help', tag_color='cyan')
+            case _:
+                pass
 
 
 if __name__ == '__main__':
