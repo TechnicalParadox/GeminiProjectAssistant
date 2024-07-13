@@ -184,7 +184,7 @@ def load_config():
                 user_model = input('Enter the model name to use (default: gemini-1.5-pro-latest): ')
                 model = user_model if user_model != '' else model
 
-                print(f'Default system instructions: {system_instructions}', color='magenta)
+                print(f'Default system instructions: {system_instructions}', color='magenta')
                 user_system_instructions = input('Enter the system instructions to provide to the model: ')
                 system_instructions = user_system_instructions if user_system_instructions != '' else system_instructions
 
