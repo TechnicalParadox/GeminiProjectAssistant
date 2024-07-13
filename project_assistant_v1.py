@@ -417,6 +417,15 @@ def add_files(project_dir, ignored_extensions): # TODO - Multimodal input
     # Print the list of files in the project directory
     for i, file in enumerate(all_files):
         print(file, tag=str(i+1), tag_color='magenta', color='white')
+
+    print('You will first be asked if you want to send in your entire listed project directory, then you will be asked to select files to send full content.', color='magenta')
+
+    # Ask the user if they would like to send the structure of the project directory
+    send_structure = input('Would you like to send the file paths of your entire project directory? (y/N): ').lower()
+    if send_structure == 'y':
+        context = 'Project directory structure:\n'
+        for file_path in all_files:
+            context += f'{file_path}\n'
     
     while True: # Loop until the user selects files or cancels
         choices = input('Enter file numbers, extensions (e.g. ".py", ".txt", etc.), "all", or "none" (comma-separated): ') # Get user input for file selection
