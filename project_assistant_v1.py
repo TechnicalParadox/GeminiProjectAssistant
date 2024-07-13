@@ -239,8 +239,6 @@ def main():
 
     # Load the config file
     model, system_instructions, safety, timeout, project_dir = load_config()
-    print(system_instructions, tag='System Instructions', tag_color='magenta', color='white')
-
 
     # Load the safety settings
     match safety:
@@ -267,10 +265,17 @@ def main():
     # Add the system instructions to the chat history
     _all_messages.append({'role': 'system','content': system_instructions, 'tokens': si_tokens})
 
+    # Print system instructions, token count and cost
+    print(_all_messages[0]['content'], tag='System Instructions', tag_color='magenta', color='white')
+    print(_all_messages[0]['tokens'], tag='Tokens', tag_color='magenta', color='white')
+    print(f'{calculate_cost(_all_messages[0]['tokens'], INPUT_PRICING):.5f}', tag='Cost', tag_color='magenta', color='white')
+
     # Display help message
     display_help()
 
-    # Main loop
+    # Main chat loop
+    while True:
+        user_input = input(f"\nType \033[36m'help'\033[0m for special commands.\n\033[32mYou: ")
     
 
 
