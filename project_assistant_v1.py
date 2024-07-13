@@ -137,7 +137,7 @@ def load_config():
                 print(f"Error loading timeout from config file. Using default {timeout} seconds.", tag='Warning', tag_color='yellow')
             # Load project directory
             try:
-                project_dir = config['project_dir']
+                project_dir = config['project_directory']
             except:
                 print(f"Error loading project directory from config file, this will severely limit usefullness of this application.", tag='Critical', tag_color='red')
     except:
@@ -229,6 +229,7 @@ def main():
     if (accept.lower() != 'y'): # Exit if user does not accept
         print('Exiting...', tag_color='red')
         quit()
+    print('Continuing...\n', color='green')
 
     # Verify environment variables are set
     if (not API_KEY or  not CONFIG):
