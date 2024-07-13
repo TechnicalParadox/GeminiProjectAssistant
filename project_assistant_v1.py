@@ -317,12 +317,12 @@ def save_chat_history(history, session_cost):
                 break
             case 'markdown': # Save chat history as markdown
                 with open(filename + '.md', 'w') as f:
-                    f.write(f'### Total session cost: ${session_cost:.5f}\n') # Write the total cost of the session to the file
+                    f.write(f'# Total session cost: ${session_cost:.5f}\n\n') # Write the total cost of the session to the file
                     f.write('---\n')
-                    f.write('### Chat History\n')
+                    f.write('# Chat History\n')
                     for i, m in enumerate(history): # Write the chat history to the file
-                        f.write(f'##### {i}. {m["role"]}, {m["tokens"]} tokens\n')
-                        f.write(f'{m["content"]}\n')
+                        f.write(f'### {i}. {m["role"]}, {m["tokens"]} tokens\n')
+                        f.write(f'{m["content"]}\n\n')
                         f.write('---\n')
                 print(f'Chat history saved to {filename}.md', tag='Success', tag_color='green') # Print success message
                 break
@@ -506,7 +506,7 @@ def main(): # TODO: If the response fails, message is added but the model has no
         match user_input:
             case 'exit': # Exit chat session, give user option to save chat history
                 s = input('Do you want to save the chat history? (y/N): ').lower() # Ask user if they want to save chat history
-                if s != 'n' or s != 'no':
+                if s != 'n' and s != 'no':
                     save(session_cost) # Save chat history
                 quit() # Exit the program
             case 'save': # Save chat history
