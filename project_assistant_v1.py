@@ -209,6 +209,32 @@ def add_message(role, content, tokens):
     _all_messages.append({'role': role, 'content': content, 'tokens': tokens, 'cost': cost})
     _messages.append({'role': role, 'content': content, 'tokens': tokens, 'cost': cost})
 
+def delete_messages(chat, msg_indicies):
+    """Delete messages from the chat history.
+
+    Args:
+        chat (genai.ChatSession): The chat session object.
+        msg_indicies (list): A list of message indicies to delete.
+    
+    Returns:
+        None
+    """
+    
+    print (chat.history) # TODO - Remove this line, verify chat history begins at index 0 while _messages is at index 1
+
+    for i in sorted(msg_indicies, reverse=True):
+        try:
+            if i == 0:
+                print("Cannot delete system instructions.", tag='Error', tag_color='red')
+                continue
+            del chat.history[i-1] # TODO - Verify chat history begins at index 0 while _messages is at index 1
+            del _messages[i]
+            print(f"Deleted message at index {i}.", tag='Delete', tag_color='magenta', color='white')
+        except IndexError:
+            print(f"Invalid message index. Message index out of range. Enter between 0 and {len(_messages) - 1}.", tag='Error', tag_color='red')
+        except ValueError:
+            print('Invalid message index. Enter a valid integer.', tag='Error', tag_color='red')
+
 def main():
     """Main function."""
     # API Key warning
@@ -289,8 +315,10 @@ def main():
         match user_input:
             case 'exit': # Exit chat session, give user option to save chat history
                 pass
-            case 'delete': # Delete messages
-                pass
+            case 'delete': # Delete messages from history
+                msg_indicies_str = input('Enter the message indicies to delete (comma-separated): ') # Get message indicies from user
+                msg_indicies = [int(x.strip()) for x in msg_indicies_str.split(',')] # Convert message indicies to integers
+                delete_messages(chat, msg_indicies) # Delete messages from chat history
             case 'files': # Add files to context
                 pass
             case 'history': # Display chat history
