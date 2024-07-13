@@ -78,11 +78,12 @@ WARNINGS = '''
 - The author of this script is not responsible for any consequences of using this application.'''
 
 HELP_MSG = '''
-'exit' - Exit the chat session and give the option to save chat history.
+'save' - Save the chat history to a file.
 'delete' - Delete messages from chat history.
 'files' - Add files and their paths to context from project directory.
 'history' - Display concise chat history.
 'view' - View a full message's content.
+'exit' - Exit the chat session and give the option to save chat history.
 'help' - Display special commands and instructions.'''
 
 HELP_WARNING = 'If you enter a command wrong, it will be sent as a message to the API, incurring costs.'
@@ -275,7 +276,16 @@ def delete_messages(chat, msg_indices):
         except ValueError:
             print('Invalid message index. Enter a valid integer.', tag='Error', tag_color='red')
 
-def save_chat_history(history):
+def save(session_cost):
+    full = input('Do you want to save the full chat history, or exclude the messages you deleted? (f/E): ').lower() # Ask user if they want to save the full chat history
+    if full == 'e' or full == 'exclude': # Save chat history excluding deleted messages
+        print('Saving chat history excluding deleted messages...', color='magenta')
+        save_chat_history(_messages, session_cost)
+    else: # Save full chat history
+        print('Saving full chat history...', color='magenta')
+        save_chat_history(_all_messages, session_cost)
+
+def save_chat_history(history, session_cost):
     """Save the chat history to a file, with total cost of session at the start of the file.
 
     Args:
@@ -286,21 +296,44 @@ def save_chat_history(history):
     """
     
     while True:
-        filetype = input('Enter the format you wish to save the chat history in (text, json, or csv): ').lower() # Get the file format from the user
-        if filetype not in ['json', 'text', 'csv']: # Check if the file format is valid
-            print('Invalid file format. Enter "text", "json", or "csv".', tag='Error', tag_color='red')
+        filetype = input('Enter the format you wish to save the chat history in (text, markdown, json, or csv): ').lower() # Get the file format from the user
+        if filetype not in ['json', 'text', 'markdown', 'csv']: # Check if the file format is valid
+            print('Invalid file format. Enter "text", "markdown", "json", or "csv".', tag='Error', tag_color='red')
             continue
         filename = input('Enter the filename (no extension) to save the chat history to (This will save in your current directory): ') # Get the filename from the user
         match filetype:
             case 'json': # Save chat history as JSON
                 with open(filename + '.json', 'w') as f:
-                    pass
+                    modified_history = [{'role': m['role'], 'content': m['content'], 'tokens': m['tokens']} for m in history]
+                    json.dump({"total_session_cost": session_cost, "chat_history": modified_history}, f, indent=4) # Write the chat history to the file
+                print(f'Chat history saved to {filename}.json', tag='Success', tag_color='green') # Print success message
+                break
             case 'text': # Save chat history as text, formatted for easy reading
                 with open(filename + '.txt', 'w') as f:
-                    pass
-            case 'markdown': # Save chat history as csv
+                    f.write(f'Total session cost: ${session_cost:.5f}\n') # Write the total cost of the session to the file
+                    for i, m in enumerate(history): # Write the chat history to the file
+                        f.write(f'{i}. {m["role"]}, {m["tokens"]} tokens - {m["content"]}\n') 
+                print(f'Chat history saved to {filename}.txt', tag='Success', tag_color='green') # Print success message
+                break
+            case 'markdown': # Save chat history as markdown
+                with open(filename + '.md', 'w') as f:
+                    f.write(f'### Total session cost: ${session_cost:.5f}\n') # Write the total cost of the session to the file
+                    f.write('---\n')
+                    f.write('### Chat History\n')
+                    for i, m in enumerate(history): # Write the chat history to the file
+                        f.write(f'##### {i}. {m["role"]}, {m["tokens"]} tokens\n')
+                        f.write(f'{m["content"]}\n')
+                        f.write('---\n')
+                print(f'Chat history saved to {filename}.md', tag='Success', tag_color='green') # Print success message
+                break
+            case 'csv': # Save chat history as csv
                 with open(filename + '.csv', 'w') as f:
-                    pass
+                    f.write(f'Session Cost:,{session_cost:.5f}\n') # Write the total cost of the session to the file
+                    f.write('Role,Tokens,Content\n') # Write the header row to the file
+                    for m in history: # Write the chat history to the file
+                        f.write(f'{m["role"]},{m["tokens"]},\"{m["content"]}\"\n')
+                print(f'Chat history saved to {filename}.csv', tag='Success', tag_color='green') # Print success message
+                break
 
 def add_files(project_dir, ignored_extensions): # TODO - Multimodal input
     """Add files to the context.
@@ -472,15 +505,12 @@ def main(): # TODO: If the response fails, message is added but the model has no
 
         match user_input:
             case 'exit': # Exit chat session, give user option to save chat history
-                save = input('Do you want to save the chat history? (y/N): ').lower() # Ask user if they want to save chat history
-                if save != 'n' or save != 'no':
-                    full = input('Do you want to save the full chat history, or exclude the messages you deleted? (f/E): ').lower() # Ask user if they want to save the full chat history
-                    if full == 'e' or full == 'exclude': # Save chat history excluding deleted messages
-                        print('Saving chat history excluding deleted messages...', color='magenta')
-                        save_chat_history(_messages)
-                    else: # Save full chat history
-                        print('Saving full chat history...', color='magenta')
-                        save_chat_history(_all_messages)
+                s = input('Do you want to save the chat history? (y/N): ').lower() # Ask user if they want to save chat history
+                if s != 'n' or s != 'no':
+                    save(session_cost) # Save chat history
+                quit() # Exit the program
+            case 'save': # Save chat history
+                save(session_cost) # Save chat history
             case 'delete': # Delete messages from history
                 msg_indicies_str = input('Enter the message indicies to delete (comma-separated):') # Get message indicies from user
                 msg_indicies = [int(x.strip()) for x in msg_indicies_str.split(',')] # Convert message indicies to integers
