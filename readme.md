@@ -27,7 +27,7 @@ You can set the project directory to your project directory. When using this app
 ![A image showing the startup message when launching the application.](images/readme.png)
 
 ## Credits
-[Giamo Lao (TechnicalParadox)](technicalparadox.github.io)
+[Giamo Lao (TechnicalParadox)](https://technicalparadox.github.io)
 ## Questions
 Any questions should be directed to 
 
