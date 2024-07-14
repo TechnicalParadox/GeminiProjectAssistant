@@ -615,7 +615,7 @@ def main():
                         print('Project directory not set in config file. Cannot add files.', tag='Error', tag_color='red')
                     else:
                         context = add_files(project_dir, ignored_extensions)
-                        message = context + "\nUser Input: " + input('Enter your message to be sent along with the files: ') # Get user input
+                        message = context + "\nUser Input: " + input('Enter your message to be sent along with the files: \033[32m') # Get user input
                         if DEBUG:
                             print(message, tag='DEBUG', tag_color='yellow')
                 case 'history': # Display chat history
