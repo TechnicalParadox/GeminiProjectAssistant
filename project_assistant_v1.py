@@ -420,10 +420,12 @@ def add_files(project_dir, ignored_extensions): # TODO - Multimodal input
 
     print('You will first be asked if you want to send in your entire listed project directory, then you will be asked to select files to send full content.', color='magenta')
 
+    context = ''
+
     # Ask the user if they would like to send the structure of the project directory
     send_structure = input('Would you like to send the file paths of your entire project directory? (y/N): ').lower()
     if send_structure == 'y':
-        context = 'Project directory structure:\n'
+        context += 'Project directory structure:\n'
         for file_path in all_files:
             context += f'{file_path}\n'
     
@@ -448,7 +450,7 @@ def add_files(project_dir, ignored_extensions): # TODO - Multimodal input
         except IndexError:
             print(f'Invalid file number. Enter a number between 1 and {len(all_files)}.', tag='Error', tag_color='red')
     
-    context = 'Files and content provided for context: ' # Initialize the context string
+    context += 'Files and content provided for context: ' # Initialize the context string
     if selected_files == []:
         context += '<none>\n' # Add a placeholder for no files selected
     else:
