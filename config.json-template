@@ -10,8 +10,8 @@
     "timeout": 240,
     # The directory of the project you are working on. It should be the full path. This example is for me on Linux. For Windows (C:\\Users\you\Development\Programming\Python\GeminiProjectAssistant)
     "project_directory": "/home/tech/Development/Programming/Python/GeminiProjectAssistant/",
-    # A list of file extensions to ignore in the project directory. [".png", ".mp4"] etc if you don't want them showing.
-    "ignored_extensions": [],
+    # A list of file extensions to ignore in the project directory. [".png", ".mp4"] etc if you don't want them showing. You can also enter specific filenames here.
+    "ignored_extensions": [".json-template", "requirements.txt"],
     # Controls the randomness of the output. The default for Gemini is 1.0 but values can range from 0.0 to 2.0.
     "temperature": 1.0,
     # Controls the maximum number of tokens used in a response. gemini-1.5-pro-latest max output is currently 8,192

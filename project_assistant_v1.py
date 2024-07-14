@@ -391,12 +391,12 @@ def save_chat_history(history, session_cost):
                 print(f'Chat history saved to {filename}.csv', tag='Success', tag_color='green') # Print success message
                 break
 
-def add_files(project_dir, ignored_extensions): # TODO - Multimodal input
+def add_files(project_dir, ignored_extensions): 
     """Add files to the context.
     
     Args:
         project_dir (str): The project directory to use.
-        ignored_extensions (list): A list of file extensions to ignore.
+        ignored_extensions (list): A list of file extensions or full file names to ignore.
 
     Returns:
         str: The context string with the files and content provided.
@@ -404,11 +404,14 @@ def add_files(project_dir, ignored_extensions): # TODO - Multimodal input
     all_files = [] # Initialize list to store all file paths in the project directory
     selected_files = [] # Initialize list to store selected file paths
 
+    # Normalize ignored extensions and file names by stripping whitespace and ensuring leading dot for extensions
+    normalized_ignored_items = [f'.{item.strip().lstrip(".")}' if not '.' in item else item.strip() for item in ignored_extensions] 
+
     # Walk through the project directory and add all files to the all_files list
     for root, dirs, files in os.walk(project_dir):
         dirs[:] = [d for d in dirs if not d.startswith('.')] # Ignore hidden directories
         for file in files:
-            if not any(file.endswith(ext) for ext in ignored_extensions) and not file.startswith('.'): # Check if the file extension is not in the ignored extensions list
+            if not file.startswith('.') and not any(file.endswith(item) or item in file for item in normalized_ignored_items): # Check if the file extension is not in the ignored extensions list
                 all_files.append(os.path.join(root, file)) # Add the file to the selected files list
     
     if all_files == []: # Check if no files were found
@@ -430,7 +433,7 @@ def add_files(project_dir, ignored_extensions): # TODO - Multimodal input
             context += f'{file_path}\n'
     
     while True: # Loop until the user selects files or cancels
-        choices = input('Enter file numbers, extensions (e.g. ".py", ".txt", etc.), "all", or "none" (comma-separated): ') # Get user input for file selection
+        choices = input('Enter file numbers, extensions (e.g. ".py", ".txt", etc.), full filenames, "all", or "none" (comma-separated): ') # Get user input for file selection
         choices = [choice.strip() for choice in choices.split(',')] # Split user input by commas and remove whitespace
 
         try: # Attempt to process user input
@@ -442,6 +445,8 @@ def add_files(project_dir, ignored_extensions): # TODO - Multimodal input
                     break # Exit the loop after selecting none
                 elif choice.startswith('.'): # Choice is a file extension
                     selected_files.extend([file for file in all_files if file.endswith(choice)]) # Add files with the specified extension to the selected files list
+                elif any(choice in file for file in all_files):
+                    selected_files.extend([file for file in all_files if choice in file])
                 else: # Choice is assuemd to be a file number
                     selected_files.append(all_files[int(choice) - 1]) # Add the file to the selected files list
             break # Exit the loop after processing all choices
@@ -656,7 +661,8 @@ def main():
                 except Exception as e:
                     tokens = model.count_tokens([{'role': 'user', 'parts':[message]}]).total_tokens - si_tokens
                     total_input_tokens += tokens
-                    add_message('User', message, tokens) # Add the user message to the chat history
+                    add_message('User', message, tokens) # Add the user message to the message history
+                    # TODO: Add the input that failed to the chat history manually
                     print(message, tag='You', tag_color='green') # Print the user's message
                     continue
 
