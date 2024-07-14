@@ -21,7 +21,7 @@
 4. Create your .env file according to the .env-template.
 5. Open terminal in the installation directory.
 6. Run `pip install -r requirements.txt`
-6. Run `python3 ./project_assistant_v1.0.4.py`
+6. Run `python3 ./project_assistant_v1.0.3.py`
 7. Follow instructions on the screen.
 ## Usage
 [example of a saved output log in markdown format.](https://github.com/TechnicalParadox/GeminiProjectAssistant/blob/master/examples/example_use.md)
