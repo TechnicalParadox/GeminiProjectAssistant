@@ -29,7 +29,7 @@ sudo apt install python3-xlib libx11-xcb-dev libxcb-cursor0 libxrender1 libxi6
 - **`libxi6`:**  XInput extension library, handling input devices like keyboards and mice in X11. 
 
 ## Installation
-1. Install the dependencies listed above.
+1. Ensure you have installed the necessary dependencies.
 2. Download the zip and extract files to the directory you wish to install in.
 3. Open installation directory.
 4. Create config.json to your specifications according to config.json-template.
