@@ -29,15 +29,16 @@ sudo apt install python3-xlib libx11-xcb-dev libxcb-cursor0 libxrender1 libxi6
 - **`libxi6`:**  XInput extension library, handling input devices like keyboards and mice in X11. 
 
 ## Installation
-0. Install the dependencies listed above.
-1. Download the zip and extract files to the directory you wish to install in.
-2. Open installation directory.
-3. Create config.json to your specifications according to config.json-template.
-4. Create your .env file according to the .env-template.
-5. Open terminal in the installation directory.
-6. Run `pip install -r requirements.txt`
-6. Run `python3 ./project_assistant_v1.0.3.py`
-7. Follow instructions on the screen.
+1. Install the dependencies listed above.
+2. Download the zip and extract files to the directory you wish to install in.
+3. Open installation directory.
+4. Create config.json to your specifications according to config.json-template.
+5. Create your .env file according to the .env-template.
+6. Open terminal in the installation directory.
+7. Run `pip install -r requirements.txt`
+8. Run `python3 ./project_assistant_v1.1.py`
+9. Follow instructions on the screen.
+
 ## Usage
 [example of a saved output log in markdown format.](https://github.com/TechnicalParadox/GeminiProjectAssistant/blob/master/examples/example_use.md)
 
