@@ -14,7 +14,22 @@
 * [Credits](#credits)
 * [Questions](#questions)
 ---------------
+## Dependencies
+
+#### Installing System Dependencies (Ubuntu/Debian)
+Before installing the Python requirements, you need to install the following system packages:
+```bash
+sudo apt update
+sudo apt install python3-xlib libx11-xcb-dev libxcb-cursor0 libxrender1 libxi6 
+```
+**Explanation of the additional libraries:**
+- **`libx11-xcb-dev`:** Provides development headers for the XCB (X protocol C binding) library, which PyQt6 likely uses internally.
+- **`libxcb-cursor0`:** Specifically handles mouse cursor rendering using XCB, essential for GUI applications.
+- **`libxrender1`:** X Render extension library, often used for advanced rendering operations (transparency, antialiasing) within X11.
+- **`libxi6`:**  XInput extension library, handling input devices like keyboards and mice in X11. 
+
 ## Installation
+0. Install the dependencies listed above.
 1. Download the zip and extract files to the directory you wish to install in.
 2. Open installation directory.
 3. Create config.json to your specifications according to config.json-template.
