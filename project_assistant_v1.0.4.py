@@ -82,6 +82,7 @@ HELP_MSG = '''
 'files' - Add files and their paths to context from project directory.
 'history' - Display concise chat history.
 'view' - View a full message's content.
+'timeout' - Change the response timeout setting for this session.
 'exit' - Exit the chat session and give the option to save chat history.
 'help' - Display special commands and instructions.'''
 
@@ -649,6 +650,9 @@ def main():
                         print(f'Invalid message index. Message index out of range. Enter between 0 and {len(_messages) - 1}.', tag='Error', tag_color='red')
                     except ValueError:
                         print('Invalid message index. Enter a valid integer.', tag='Error', tag_color='red')
+                case 'timeout': # Adjust the timeout setting
+                    timeout = int(input('Enter the new timeout setting in seconds: ')) # Get the new timeout setting from the user
+                    print(f'Set to {timeout} seconds.', tag='Timeout', tag_color='magenta') # Print the new timeout setting
                 case 'help': # Display help message
                     print(HELP_MSG, tag='Help', tag_color='cyan')
                 case _: # Send user input to the model
