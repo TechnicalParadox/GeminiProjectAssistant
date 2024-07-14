@@ -579,96 +579,107 @@ def main():
 
     # Main chat loop
     while True:
-        # Get user input
-        user_input = input(f"\nType \033[36m'help'\033[0m for special commands.\n\033[32mYou: ")
-        print()
+        # Catch KeyboardInterrupt to exit gracefully
+        try:
 
-        message = None  # Reset message to None for each iteration
+            # Get user input
+            user_input = input(f"\nType \033[36m'help'\033[0m for special commands.\n\033[32mYou: ")
+            print()
 
-        match user_input:
-            case 'exit': # Exit chat session, give user option to save chat history
-                s = input('Do you want to save the chat history? (y/N): ').lower() # Ask user if they want to save chat history
-                if s != 'n' and s != 'no':
+            message = None  # Reset message to None for each iteration
+
+            match user_input:
+                case 'exit': # Exit chat session, give user option to save chat history
+                    s = input('Do you want to save the chat history? (y/N): ').lower() # Ask user if they want to save chat history
+                    if s != 'n' and s != 'no':
+                        save(session_cost) # Save chat history
+                    print('Exiting...', tag='Exit', tag_color='magenta', color='white') # Print exit message
+                    quit() # Exit the program
+                case 'save': # Save chat history
                     save(session_cost) # Save chat history
-                quit() # Exit the program
-            case 'save': # Save chat history
-                save(session_cost) # Save chat history
-            case 'delete': # Delete messages from history
-                msg_indicies_str = input('Enter the message indicies to delete (comma-separated):') # Get message indicies from user
-                msg_indicies = [int(x.strip()) for x in msg_indicies_str.split(',')] # Convert message indicies to integers
-                new_cost = delete_messages(chat, msg_indicies) # Delete messages from chat history
-                print(f'New history base input cost: ${new_cost:.5f}', tag='New Cost', tag_color='magenta', color='white') # Print the new base input cost
-            case 'files': # Add files to context
-                if project_dir is None:
-                    print('Project directory not set in config file. Cannot add files.', tag='Error', tag_color='red')
-                else:
-                    context = add_files(project_dir, ignored_extensions)
-                    message = context + "\nUser Input: " + input('Enter your message to be sent along with the files: ') # Get user input
-                    if DEBUG:
-                        print(message, tag='DEBUG', tag_color='yellow')
-            case 'history': # Display chat history
-                print(tag='Chat History', tag_color='magenta')
-                for i, m in enumerate(_messages): # Loop through messages in chat history
-                    # Calculate message content preview, removing newlines
-                    content_preview = m['content'][:75] + ' ... ' + m['content'][-75:] if len(m['content']) > 150 else m['content']
-                    content_preview = content_preview.replace('\n', ' ')
-                    cost_to_keep = calculate_cost(m['tokens'], INPUT_PRICING, history=True) # Calculate cost to keep message
-                    match m['role']:
-                        case 'System':
-                            print(f'Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}', tag=str(i), tag_color='magenta', color='white')
-                            print(content_preview, tag='System', tag_color='magenta')
-                        case 'User':
-                            print(f'Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}', tag=str(i), tag_color='magenta', color='white')
-                            print(content_preview, tag='User', tag_color='green')
-                        case 'Model':
-                            print(f'Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}', tag=str(i), tag_color='magenta', color='white')
-                            print(content_preview, tag='Model', tag_color='blue')
-                print(f'History base input cost: ${sum(m['cost'] for m in _messages):.5f}', tag='Input Cost', tag_color='magenta', color='white') # Print the history base input cost
-            case 'view': # View a full message's content
-                message_index = input('Enter the message index to view: ') # Get message index from user
+                case 'delete': # Delete messages from history
+                    msg_indicies_str = input('Enter the message indicies to delete (comma-separated):') # Get message indicies from user
+                    msg_indicies = [int(x.strip()) for x in msg_indicies_str.split(',')] # Convert message indicies to integers
+                    new_cost = delete_messages(chat, msg_indicies) # Delete messages from chat history
+                    print(f'New history base input cost: ${new_cost:.5f}', tag='New Cost', tag_color='magenta', color='white') # Print the new base input cost
+                case 'files': # Add files to context
+                    if project_dir is None:
+                        print('Project directory not set in config file. Cannot add files.', tag='Error', tag_color='red')
+                    else:
+                        context = add_files(project_dir, ignored_extensions)
+                        message = context + "\nUser Input: " + input('Enter your message to be sent along with the files: ') # Get user input
+                        if DEBUG:
+                            print(message, tag='DEBUG', tag_color='yellow')
+                case 'history': # Display chat history
+                    print(tag='Chat History', tag_color='magenta')
+                    for i, m in enumerate(_messages): # Loop through messages in chat history
+                        # Calculate message content preview, removing newlines
+                        content_preview = m['content'][:75] + ' ... ' + m['content'][-75:] if len(m['content']) > 150 else m['content']
+                        content_preview = content_preview.replace('\n', ' ')
+                        cost_to_keep = calculate_cost(m['tokens'], INPUT_PRICING, history=True) # Calculate cost to keep message
+                        match m['role']:
+                            case 'System':
+                                print(f'Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}', tag=str(i), tag_color='magenta', color='white')
+                                print(content_preview, tag='System', tag_color='magenta')
+                            case 'User':
+                                print(f'Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}', tag=str(i), tag_color='magenta', color='white')
+                                print(content_preview, tag='User', tag_color='green')
+                            case 'Model':
+                                print(f'Tokens: {m['tokens']}, Cost to keep: ${cost_to_keep:.5f}', tag=str(i), tag_color='magenta', color='white')
+                                print(content_preview, tag='Model', tag_color='blue')
+                    print(f'History base input cost: ${sum(m['cost'] for m in _messages):.5f}', tag='Input Cost', tag_color='magenta', color='white') # Print the history base input cost
+                case 'view': # View a full message's content
+                    message_index = input('Enter the message index to view: ') # Get message index from user
+                    try:
+                        match _messages[int(message_index)]['role']: # Display and color message content based on role
+                            case 'System':
+                                print(_messages[int(message_index)]['content'], tag='System', tag_color='magenta')
+                            case 'User':
+                                print(_messages[int(message_index)]['content'], tag='User', tag_color='green')
+                            case 'Model':
+                                print(_messages[int(message_index)]['content'], tag='Model', tag_color='blue')
+                    except IndexError:
+                        print(f'Invalid message index. Message index out of range. Enter between 0 and {len(_messages) - 1}.', tag='Error', tag_color='red')
+                    except ValueError:
+                        print('Invalid message index. Enter a valid integer.', tag='Error', tag_color='red')
+                case 'help': # Display help message
+                    print(HELP_MSG, tag='Help', tag_color='cyan')
+                case _: # Send user input to the model
+                    message = user_input 
+
+            # Process the message if it's not a command or 'files' command set a message       
+            if message: # TODO: If the response fails, message is added but the model has no access to it. Need to fix this somehow.
                 try:
-                    match _messages[int(message_index)]['role']: # Display and color message content based on role
-                        case 'System':
-                            print(_messages[int(message_index)]['content'], tag='System', tag_color='magenta')
-                        case 'User':
-                            print(_messages[int(message_index)]['content'], tag='User', tag_color='green')
-                        case 'Model':
-                            print(_messages[int(message_index)]['content'], tag='Model', tag_color='blue')
-                except IndexError:
-                    print(f'Invalid message index. Message index out of range. Enter between 0 and {len(_messages) - 1}.', tag='Error', tag_color='red')
-                except ValueError:
-                    print('Invalid message index. Enter a valid integer.', tag='Error', tag_color='red')
-            case 'help': # Display help message
-                print(HELP_MSG, tag='Help', tag_color='cyan')
-            case _: # Send user input to the model
-                message = user_input 
+                    input_tokens, output_tokens, response = send_message(chat, message, timeout) # Send the message to the model
+                except Exception as e:
+                    tokens = model.count_tokens([{'role': 'user', 'parts':[message]}]).total_tokens - si_tokens
+                    total_input_tokens += tokens
+                    add_message('User', message, tokens) # Add the user message to the chat history
+                    print(message, tag='You', tag_color='green') # Print the user's message
+                    continue
 
-        # Process the message if it's not a command or 'files' command set a message       
-        if message: # TODO: If the response fails, message is added but the model has no access to it. Need to fix this somehow.
-            try:
-                input_tokens, output_tokens, response = send_message(chat, message, timeout) # Send the message to the model
-            except Exception as e:
-                tokens = model.count_tokens([{'role': 'user', 'parts':[message]}]).total_tokens - si_tokens
-                total_input_tokens += tokens
-                add_message('User', message, tokens) # Add the user message to the chat history
-                print(message, tag='You', tag_color='green') # Print the user's message
-                continue
+                # Add the number of tokens used in this message to the total token counts
+                total_input_tokens += input_tokens
+                total_output_tokens += output_tokens
 
-            # Add the number of tokens used in this message to the total token counts
-            total_input_tokens += input_tokens
-            total_output_tokens += output_tokens
+                add_message('User', message, model.count_tokens([{'role': 'user', 'parts':[message]}]).total_tokens - si_tokens) # Add the user message to the chat history
+                print(message+'\n', tag='You', tag_color='green') # Print the user's message
 
-            add_message('User', message, model.count_tokens([{'role': 'user', 'parts':[message]}]).total_tokens - si_tokens) # Add the user message to the chat history
-            print(message+'\n', tag='You', tag_color='green') # Print the user's message
+                add_message('Model', response, model.count_tokens([{'role': 'model', 'parts':[response]}]).total_tokens - si_tokens) # Add the model response to the chat history
+                print(response, tag='Model', tag_color='blue') # Print the model's response
+                
+                # Print the number of input and output tokens used and the costs
+                print(f'Tokens: {input_tokens}, Cost: ${calculate_cost(input_tokens, INPUT_PRICING):.5f}', tag='Input', tag_color='magenta', color='white') # Print the number of input tokens used and the cost
+                print(f'Tokens: {output_tokens}, Cost: ${calculate_cost(output_tokens, OUTPUT_PRICING):.5f}', tag='Output', tag_color='magenta', color='white') # Print the number of output tokens used and the cost
+                session_cost = calculate_cost(total_input_tokens, INPUT_PRICING) + calculate_cost(total_output_tokens, OUTPUT_PRICING)
+                print(f'${session_cost:.5f}', tag='Session Cost', tag_color='magenta', color='white') # Print the total cost of the session
 
-            add_message('Model', response, model.count_tokens([{'role': 'model', 'parts':[response]}]).total_tokens - si_tokens) # Add the model response to the chat history
-            print(response, tag='Model', tag_color='blue') # Print the model's response
-            
-            # Print the number of input and output tokens used and the costs
-            print(f'Tokens: {input_tokens}, Cost: ${calculate_cost(input_tokens, INPUT_PRICING):.5f}', tag='Input', tag_color='magenta', color='white') # Print the number of input tokens used and the cost
-            print(f'Tokens: {output_tokens}, Cost: ${calculate_cost(output_tokens, OUTPUT_PRICING):.5f}', tag='Output', tag_color='magenta', color='white') # Print the number of output tokens used and the cost
-            session_cost = calculate_cost(total_input_tokens, INPUT_PRICING) + calculate_cost(total_output_tokens, OUTPUT_PRICING)
-            print(f'${session_cost:.5f}', tag='Session Cost', tag_color='magenta', color='white') # Print the total cost of the session
+        except KeyboardInterrupt: # Catch KeyboardInterrupt to exit gracefully
+            s = input('Do you want to save the chat history? (y/N): ').lower()
+            if s != 'n' and s != 'no':
+                save(session_cost)
+            print('Exiting...', tag='Exit', tag_color='magenta', color='white')
+            quit()
 
 if __name__ == '__main__':
     main()
