@@ -198,7 +198,7 @@ def load_config():
                 user_project_dir = input('Enter the full project directory to use (default: None): ')
                 project_dir = user_project_dir if user_project_dir != '' else project_dir
 
-                user_ignored_extensions = input('Enter the file extensions to ignore in the project directory (comma-separated). Hidden files are ignored: ').split(',')
+                user_ignored_extensions = input('Enter the file extensions to ignore in the project directory (comma-separated). Hidden files are ignored, you can also enter full filenames to ignore: ').split(',')
                 ignored_extensions = user_ignored_extensions if user_ignored_extensions != '' else ignored_extensions
                 
                 user_temperature = input('Enter the temperature setting to use (default: 1.0): ')
