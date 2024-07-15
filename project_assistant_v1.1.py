@@ -53,18 +53,34 @@ HIGH_SAFETY = {
     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE
 }
 
-# Gemini Pricing per 1 million tokens (as of July 10, 2024)
-PRICING_DATE = '2024-07-13'
-PRICING_MODEL = 'gemini-1.5-pro-latest'
-
-INPUT_PRICING = {
+# Gemini 1.5 Pro Latest Pricing per 1 million tokens (as of July 15, 2024)
+G1_5_PRO_PRICING_DATE = '2024-07-15'
+G1_5_PRO_PRICING_MODEL = 'gemini-1.5-pro-latest'
+G1_5_PRO_INPUT_PRICING = {
     "upto_128k": 3.50, # Price per million tokens for prompts up to 128,000 tokens
     "over_128k": 7.00 # Price per million tokens for prompts over 128,000 tokens
 }
-OUTPUT_PRICING = {
+G1_5_PRO_OUTPUT_PRICING = {
     "upto_128k": 10.50, # Price per million tokens for outputs up to 128,000 tokens
     "over_128k": 21.00 # Price per million tokens for outputs over 128,000 tokens
 }
+
+# Gemini 1.5 Flash Latest Pricing per 1 million tokens (as of July 15, 2024)
+G1_5_FLASH_PRICING_DATE = '2024-07-15'
+G1_5_FLASH_PRICING_MODEL = 'gemini-1.5-flash'
+G1_5_FLASH_INPUT_PRICING = {
+    "upto_128k": 0.35, # Price per million tokens for prompts up to 128,000 tokens
+    "over_128k": 0.70 # Price per million tokens for prompts over 128,000 tokens
+}
+G1_5_FLASH_OUTPUT_PRICING = {
+    "upto_128k": 1.05, # Price per million tokens for outputs up to 128,000 tokens
+    "over_128k": 2.10 # Price per million tokens for outputs over 128,000 tokens
+}
+
+PRICING_DATE = None
+PRICING_MODEL = None
+INPUT_PRICING = None
+OUTPUT_PRICING = None
 
 INSTRUCTIONS = '''<br>
 - Converse with the LLM model to get help with your project. Ex. 'Help me debug this script.', 'Complete the TODOs in this file.', 'What can I add to improve this project?', etc.<br>
@@ -165,13 +181,30 @@ class MainWindow(QMainWindow):
         self.display_message("Welcome", "Welcome to Gemini Project Assistant!")
 
         # Load Configuration and API Key
-        self.load_config()  
+        self.load_config()
         self.load_api_key()
         self.generation_config = {
             "temperature": self.temperature,
             "max_output_tokens": self.max_output_tokens,
             "stop_sequences": self.stop_sequences
         }
+
+        # Set pricing based on model
+        global PRICING_DATE, PRICING_MODEL, INPUT_PRICING, OUTPUT_PRICING
+        match self.model_name:
+            case 'gemini-1.5-pro-latest':
+                PRICING_DATE = G1_5_PRO_PRICING_DATE
+                PRICING_MODEL = G1_5_PRO_PRICING_MODEL
+                INPUT_PRICING = G1_5_PRO_INPUT_PRICING
+                OUTPUT_PRICING = G1_5_PRO_OUTPUT_PRICING
+            case 'gemini-1.5-flash':
+                PRICING_DATE = G1_5_FLASH_PRICING_DATE
+                PRICING_MODEL = G1_5_FLASH_PRICING_MODEL
+                INPUT_PRICING = G1_5_FLASH_INPUT_PRICING
+                OUTPUT_PRICING = G1_5_FLASH_OUTPUT_PRICING
+        
+        # Update status bar after pricing loaded
+        self.update_status_bar()
 
         # Display current pricing information
         self.display_message("Pricing", f"Pricing as of {PRICING_DATE} for {PRICING_MODEL}:")
@@ -577,7 +610,6 @@ class MainWindow(QMainWindow):
         """Creates the status bar."""
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
-        self.update_status_bar()
 
     def load_api_key(self):
         """Loads the API key from the .env file. If not found,
@@ -805,7 +837,7 @@ class SettingsDialog(QDialog):
         # Model Selection
         self.model_label = QLabel("Model:")
         self.model_combo = QComboBox(self)
-        self.model_combo.addItems(["gemini-1.5-pro-latest", "gemini-1.5-pro", "gemini-1.5-flash"]) # Add more models as needed
+        self.model_combo.addItems(["gemini-1.5-pro-latest", "gemini-1.5-flash"]) # Add more models as needed
         layout.addWidget(self.model_label)
         layout.addWidget(self.model_combo)
 
@@ -934,7 +966,7 @@ class SettingsDialog(QDialog):
             with open(config_file, 'w') as f:
                 json.dump(config, f, indent=4)
 
-            QMessageBox.information(self, "Success", "Settings saved successfully. The application may need restarted for some changes to be applied. (System instructions, for example.)")
+            QMessageBox.information(self, "Success", "Settings saved successfully.<br>The application may need restarted for some changes to be applied. (Model, system instructions, etc.)<br>It's recommended that you save and reload.")
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred while saving the settings: {e}")
