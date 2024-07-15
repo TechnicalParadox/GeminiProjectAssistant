@@ -66,11 +66,10 @@ OUTPUT_PRICING = {
     "over_128k": 21.00 # Price per million tokens for outputs over 128,000 tokens
 }
 
-# TODO: Format these and display on startup
-INSTRUCTIONS = '''
-- Converse with the LLM model to get help with your project. Ex. 'Help me debug this script.', 'Complete the TODOs in this file.', 'What can I add to improve this project?', etc.
-- Cost will be shown for each message and the total cost of the session will be displayed.
-- You can provide context by selecting files from your project directory.
+INSTRUCTIONS = '''<br>
+- Converse with the LLM model to get help with your project. Ex. 'Help me debug this script.', 'Complete the TODOs in this file.', 'What can I add to improve this project?', etc.<br>
+- Cost will be shown for each message and the total cost of the session will be displayed.<br>
+- You can provide context by selecting files from your project directory.<br>
 - You can delete messages to refine the chat history and save costs while maintaining the context you need.'''
 
 WARNINGS = '''
@@ -85,21 +84,6 @@ WARNINGS = '''
 - AI generated code may contain bugs or security vulnerabilities. Review and test thoroughly.
 - AI generated code may be harmful or malicious. Review and validate generated code carefully.
 - The author of this script is not responsible for any consequences of using this application.'''
-
-HELP_MSG = '''
-Available Commands:
-'save' - Save the chat history to a file.
-'delete' - Delete messages from chat history.
-'files' - Add files and their paths to context from project directory.
-'history' - Display concise chat history.
-'view' - View a full message's content.
-'timeout' - Change the response timeout setting for this session.
-'clear' - Clear the chat history for this session.
-'exit' - Exit the chat session and give the option to save chat history.
-'help' - Display special commands and instructions.
-
-If you enter a command wrong, it will be sent as a message to the API, incurring costs.
-'''
 
 def calculate_cost(tokens, pricing):
     """Calculates the cost based on token usage.
@@ -224,56 +208,14 @@ class MainWindow(QMainWindow):
         user_input = self.input_box.text()
         self.input_box.clear()
 
-        self.process_user_input(user_input)
-
-    def process_user_input(self, user_input):
-        """Processes user input, handling both messages and special commands."""
-        message = None  # Reset message to None for each iteration
-
-        match user_input.lower():  # Convert input to lowercase for matching
-            case 'exit':  # Exit chat session, give user option to save chat history
-                if (
-                    QMessageBox.question(
-                        self,
-                        "Exit",
-                        "Are you sure you want to exit? Do you want to save the chat history?",
-                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    )
-                    == QMessageBox.StandardButton.Yes
-                ):
-                    self.save_chat_history()
-                    QApplication.quit()
-            case 'save':  # Save chat history
-                self.save_chat_history()
-            case 'delete':  # Delete messages from history
-                self.delete_messages()
-            case 'files':  # Add files to context
-                self.add_files_to_context()
-            case 'history':  # Display concise chat history
-                self.display_chat_history()
-            case 'view':  # View a full message's content
-                self.view_full_message()
-            case 'timeout':  # Adjust the timeout setting
-                timeout, ok = QInputDialog.getInt(self, "Timeout", "Enter new timeout (seconds):", self.timeout, step=10)
-                if ok:
-                    self.timeout = timeout
-                    self.display_message("Timeout", f'Timeout set to {self.timeout} seconds.')
-            case 'clear': # Clear the chat history
-                self.clear_chat_history()
-            case 'help':  # Display help message
-                self.display_message("Help", HELP_MSG)
-            case _:  # Send user input to the model
-                message = user_input
-
-        if message:
-            self.send_message_to_model(message, self.timeout)
+        self.send_message_to_model(user_input, self.timeout)
 
     def delete_messages(self):
         """Deletes messages from history and updates the model's context."""
         message_indices_str, ok = QInputDialog.getText(
             self,
             "Delete Messages",
-            "Enter the indices of messages to delete (comma-separated):",
+            "You may want to save first.<br>Message indicies are shown with the Display Chat History command.<br>Enter the indices of messages to delete (comma-separated):",
         )
         if DEBUG:
             print("DEBUG: User entered message indices:", message_indices_str, tag="DEBUG", tag_color="cyan", color="white")
@@ -416,7 +358,7 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             if DEBUG:
-                print(f"DEBUG: Error sending message: {e}")
+                print(f"Error sending message: {e}", tag='Debug', tag_color='red') # TODO: deadline exceeded crashes the program. Handle this
             # Handle other exceptions appropriately
             raise e
 
@@ -553,11 +495,44 @@ class MainWindow(QMainWindow):
         config_action.triggered.connect(self.configure_settings)
         settings_menu.addAction(config_action)
 
+        # **Tools Menu**
+        tools_menu = menu_bar.addMenu("Tools")
+        
+        delete_action = QAction("Delete Messages", self)
+        delete_action.triggered.connect(self.delete_messages)
+        tools_menu.addAction(delete_action)
+
+        files_action = QAction("Add Files to Context", self)
+        files_action.triggered.connect(self.add_files_to_context)
+        tools_menu.addAction(files_action)
+        
+        history_action = QAction("Display Chat History", self)
+        history_action.triggered.connect(self.display_chat_history)
+        tools_menu.addAction(history_action)
+
+        view_action = QAction("View Full Message", self)
+        view_action.triggered.connect(self.view_full_message)
+        tools_menu.addAction(view_action)
+
+        timeout_action = QAction("Set Timeout", self)
+        timeout_action.triggered.connect(self.set_timeout)
+        tools_menu.addAction(timeout_action)
+
+        clear_action = QAction("Clear Chat History", self)
+        clear_action.triggered.connect(self.clear_chat_history)
+        tools_menu.addAction(clear_action)
+
         # Help Menu
         help_menu = menu_bar.addMenu("Help")
-        help_action = QAction("Show Help", self)
-        help_action.triggered.connect(lambda: self.display_message("Help", HELP_MSG))
-        help_menu.addAction(help_action)
+        instructions_action = QAction("Show Instructions", self)
+        instructions_action.triggered.connect(lambda: self.display_message("Instructions", INSTRUCTIONS))
+        help_menu.addAction(instructions_action)
+
+    def set_timeout(self):
+        """Opens a dialog to adjust the timeout setting."""
+        timeout, ok = QInputDialog.getInt(self, "Timeout", "Enter new timeout (seconds):", self.timeout, step=10)
+        if ok: self.timeout = timeout
+        self.display_message("Timeout", f'Timeout set to {self.timeout} seconds.')
 
     def create_chat_window(self):
         """Creates the chat window area."""
@@ -791,7 +766,7 @@ class MainWindow(QMainWindow):
             QMessageBox.question(
                 self,
                 "Confirm Clear",
-                "Are you sure you want to clear the chat history?",
+                "Are you sure you want to clear the chat history? Cancel and save first if needed.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             == QMessageBox.StandardButton.Yes
@@ -799,11 +774,13 @@ class MainWindow(QMainWindow):
             self.chat_history.clear()  # Clear the chat history 
             self.messages.clear()  # Clear the messages list
             self.chat = self.model.start_chat() # Start a fresh chat
+            ''' TODO: Ask if the user wants to clear the session cost
             self.total_input_tokens = 0
             self.total_output_tokens = 0
             self.last_input_tokens = 0
             self.last_output_tokens = 0
             self.session_cost = 0.00
+            '''
             self.update_chat_window()  # Update the chat window
             self.update_status_bar()  # Update the status bar
 
@@ -948,8 +925,8 @@ class SettingsDialog(QDialog):
             }
             with open(config_file, 'w') as f:
                 json.dump(config, f, indent=4)
-            # You might want to inform the user that the save was successful
-            QMessageBox.information(self, "Success", "Settings saved successfully.")
+
+            QMessageBox.information(self, "Success", "Settings saved successfully. The application may need restarted for some changes to be applied. (System instructions, for example.)")
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred while saving the settings: {e}")
