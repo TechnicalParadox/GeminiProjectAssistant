@@ -275,7 +275,7 @@ class MainWindow(QMainWindow):
             self.display_message("Files", context)  
 
             # Get additional user input after adding files
-            user_message, ok = QInputDialog.getText(
+            user_message, ok = QInputDialog.getMultiLineText(
                 self, "Input", "Enter your message:"
             )
             if ok and user_message:
