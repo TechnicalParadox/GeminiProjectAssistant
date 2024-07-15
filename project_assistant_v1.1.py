@@ -6,7 +6,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv, set_key
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from google.api_core.exceptions import DeadlineExceeded, InvalidArgument
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QLabel, QVBoxLayout, QLineEdit, QMessageBox, QFileDialog, QTextEdit, QFontDialog, QColorDialog, QInputDialog, QListWidget, QStatusBar
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QLabel, QVBoxLayout, QLineEdit, QMessageBox, QFileDialog, QTextEdit, QFontDialog, QColorDialog, QInputDialog, QListWidget, QStatusBar, QHBoxLayout, QComboBox, QSpinBox, QDoubleSpinBox, QDialog
 from PyQt6.QtCore import Qt, QSize, QEvent
 from PyQt6.QtGui import QFont, QColor, QAction
 
@@ -94,6 +94,7 @@ Available Commands:
 'history' - Display concise chat history.
 'view' - View a full message's content.
 'timeout' - Change the response timeout setting for this session.
+'clear' - Clear the chat history for this session.
 'exit' - Exit the chat session and give the option to save chat history.
 'help' - Display special commands and instructions.
 
@@ -152,6 +153,7 @@ class MainWindow(QMainWindow):
         self.safety_level = 'medium' # default
         self.safety_settings = MEDIUM_SAFETY
         self.system_message_displayed = False
+        self.api_key_invalid = False
 
         # Create UI elements
         self.central_widget = QWidget()
@@ -224,6 +226,8 @@ class MainWindow(QMainWindow):
                 if ok:
                     self.timeout = timeout
                     self.display_message("Timeout", f'Timeout set to {self.timeout} seconds.')
+            case 'clear': # Clear the chat history
+                self.clear_chat_history()
             case 'help':  # Display help message
                 self.display_message("Help", HELP_MSG)
             case _:  # Send user input to the model
@@ -268,10 +272,10 @@ class MainWindow(QMainWindow):
                         if DEBUG:
                             print(f"DEBUG: chat.history after deletion: {self.chat.history}", tag="DEBUG", tag_color="cyan", color="white")
 
+                        self.display_message("System", f"Deleted message at index {i}.") # Tell the user the message was deleted
                     else:
                         self.display_message("Error", f"Invalid message index: {i}")
                 # Refresh the chat history after deleting
-                self.chat_history = [f"<span style='color:#00ff00;'><strong>You:</strong></span> {m['content']}<br>" if m['role'] == "User" else f"<span style='color:cyan;'><strong>Model:</strong></span> {m['content']}<br>" for m in self.messages] 
                 self.update_chat_window()
             except ValueError:
                 self.display_message("Error", "Invalid input. Enter message indices as comma-separated numbers.")
@@ -327,12 +331,12 @@ class MainWindow(QMainWindow):
     def view_full_message(self):
         """Allows the user to view the full content of a message."""
         message_index, ok = QInputDialog.getInt(
-            self, "View Message", "Enter message index:", 1, 1, len(self.chat_history), 1
+            self, "View Message", "Enter message index:", 1, 1, len(self.messages), 1 # Use self.messages since this is what the index refers to
         )
         if ok:
             try:
-                message = self.chat_history[message_index - 1]
-                QMessageBox.information(self, "Message Content", message)
+                message = self.messages[message_index - 1] # Adjust for zero-based indexing
+                QMessageBox.information(self, "Message Content", message['content']) # Only display the content
             except IndexError:
                 self.display_message("Error", "Invalid message index.")
     
@@ -344,9 +348,8 @@ class MainWindow(QMainWindow):
             input_tokens = total_message_tokens - self.system_instruction_tokens
 
             # Add messages to history for display and saving BEFORE sending the request
-            self.chat_history.append(f"<span style='color:#00ff00;'><strong>You:</strong></span> {message}<br>")
             self.messages.append({"role": "User", "content": message, "tokens": input_tokens}) # Store message in all_messages
-            self.update_chat_window()
+            self.display_message("User", message)
 
             if DEBUG:
                 print("Sending message to model:", message, tag='Debug', tag_color='cyan', color='white')
@@ -369,9 +372,8 @@ class MainWindow(QMainWindow):
             self.total_output_tokens += self.last_output_tokens
 
             # Add Model response to chat history
-            self.chat_history.append(f"<span style='color:cyan;'><strong>Model:</strong></span> {response.text}<br>") 
             self.messages.append({"role": "Model", "content": response.text, "tokens": self.last_output_tokens}) # Store message in all_messages
-            self.update_chat_window()
+            self.display_message("Model", response.text)
 
             # Update session cost 
             self.session_cost = calculate_cost(self.total_input_tokens, INPUT_PRICING) + calculate_cost(self.total_output_tokens, OUTPUT_PRICING)
@@ -390,7 +392,7 @@ class MainWindow(QMainWindow):
         """Displays a message in the chat window with appropriate formatting."""
         color = ""
         match sender:
-            case "You":
+            case "User":
                 color = "#00ff00" # Code green
             case "Model":
                 color = "#00ffff" # Cyan
@@ -427,7 +429,6 @@ class MainWindow(QMainWindow):
                         content = message_data['content']
                         tokens = message_data.get('tokens', 0) # Get tokens, default to 0 if not present in older files
                         self.messages.append({"role": role, "content": content, "tokens": tokens})
-                        self.chat_history.append(f"<span style='color:#00ff00;'><strong>You:</strong></span> {content}<br>" if role == "User" else f"<span style='color:cyan;'><strong>Model:</strong></span> {content}<br>")
                         self.chat.history.append({'parts': [{'text': content}], 'role': role.lower()})
                     self.update_chat_window()
                     self.update_status_bar()
@@ -436,31 +437,25 @@ class MainWindow(QMainWindow):
                 self.display_message("Error", f"Error loading chat history: {e}")
 
     def save_chat_history(self):
-        # Display an information message box about file formats
-        format_info_msg = QMessageBox(self)
-        format_info_msg.setIcon(QMessageBox.Icon.Information)
-        format_info_msg.setWindowTitle("Save Format Information")
-        format_info_msg.setText("You can save in '.json', '.txt', '.md', or '.csv' formats, "
-                                "but this application can only load '.json' files.")
-        format_info_msg.setStandardButtons(QMessageBox.StandardButton.Ok)
-        format_info_msg.exec()  # Wait for the user to acknowledge
-
         """Opens a dialog to save chat history to a file."""
+
+        # Dialog for file type selection
+        file_formats = ["JSON (*.json)", "Text (*.txt)", "Markdown (*.md)", "CSV (*.csv)"]
+        selected_filter, ok = QInputDialog.getItem(self, "Choose File Format", "Select a file format:", file_formats, 0, False)
+        if not ok:
+            return  # User canceled the dialog
+
         file_dialog = QFileDialog(self)
-        file_dialog.setNameFilter("Chat History (*.json *.txt *.md *.csv)")  # Allow multiple file types
-        file_dialog.setDefaultSuffix(".json")  # Set default to JSON
+        file_dialog.setNameFilter(selected_filter)  # Set the selected filter
         file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
 
         if file_dialog.exec():
             filename = file_dialog.selectedFiles()[0]
 
-            # Get the chosen file format based on the file extension
-            file_extension = os.path.splitext(filename)[1].lower()
-
             try:
                 with open(filename, "w") as f:
-                    match file_extension:
-                        case ".json":
+                    match selected_filter:
+                        case "JSON (*.json)":
                             data = {
                                 "total_session_cost": self.session_cost,
                                 "system_instruction": {
@@ -471,12 +466,12 @@ class MainWindow(QMainWindow):
                                 "chat_history": self.messages
                             }
                             json.dump(data, f, indent=4)
-                        case ".txt":
+                        case "Text (*.txt)":
                             f.write(f"Total session cost: ${self.session_cost:.5f}\n\n")
                             f.write(f"0. System Instructions, {self.system_instruction_tokens} tokens - {self.system_instructions}\n") # System instructions at index 0
                             for i, m in enumerate(self.messages):
                                 f.write(f"{i+1}. {m['role']}, {m['tokens']} tokens - {m['content']}\n")
-                        case ".md":
+                        case "Markdown (*.md)":
                             f.write(f"# Total session cost: ${self.session_cost:.5f}\n\n")
                             f.write("---\n")
                             f.write(f"### 0. System Instructions, {self.system_instruction_tokens} tokens\n")
@@ -487,7 +482,7 @@ class MainWindow(QMainWindow):
                                 f.write(f"### {i+1}. {m['role']}, {m['tokens']} tokens\n")
                                 f.write(f"{m['content']}\n\n")
                                 f.write("---\n")
-                        case ".csv":
+                        case "CSV (*.csv)":
                             f.write(f'Session Cost:,{self.session_cost:.5f}\n')
                             f.write("Role,Tokens,Content\n")
                             f.write(f"System Instructions,{self.system_instruction_tokens},\"{self.system_instructions}\"\n") # System instructions on the first line
@@ -603,36 +598,49 @@ class MainWindow(QMainWindow):
             API_KEY = api_key
             set_key(ENV_FILE, "API_KEY", API_KEY)
             self.display_message(
-                "API Key", "API Key set successfully. You may have to restart the application."
+                "API Key", "API Key set successfully. Restart the application for it to take effect."
             )
         elif not ok:
             self.display_message(
                 "API Key", "API Key not set. Using the existing key from .env."
             )
-    
+
     def configure_settings(self):
         """Allows the user to configure application settings."""
-        pass  # TODO: Implement this
+        dialog = SettingsDialog(self) # Create an instance of the SettingsDialog
+        if dialog.exec() == QDialog.accepted: # Use exec() instead of show() to run the dialog modally
+            self.load_config() # Reload config if settings are changed
+            self.generation_config = { # Update generation_config
+                "temperature": self.temperature,
+                "max_output_tokens": self.max_output_tokens,
+                "stop_sequences": self.stop_sequences
+            }
+            # Update the model with the new settings and restart the chat
+            self.initialize_model()
+            self.chat = self.model.start_chat()
+            self.display_message('System', 'Settings updated.') # Inform the user that the settings have been updated
 
     def load_system_instructions(self):
         """Loads and displays the system instructions."""
         if self.model and not self.system_message_displayed:
-            system_instructions = self.model.system_instruction # TODO: Why is .system_instruction whited out in code like it's not a valid variable
+            system_instructions = self.model._system_instruction # Access using _system_instruction
             si_tokens = self.model.count_tokens(" ").total_tokens
             self.display_message("System Instructions", system_instructions)
             self.display_message("Tokens", si_tokens)
             self.display_message("Cost", f"${calculate_cost(si_tokens, INPUT_PRICING):.5f}")
-            self.system_message_displayed = True # TODO: Only needs to show again if they're changed while running
+            self.system_message_displayed = True 
 
     def update_chat_window(self):
         """Updates the chat window with the current chat history."""
-        self.chat_window.setHtml("\n".join(self.chat_history)) # TODO: Ensure the entire history isn't repeatedly added each time since we aren't clearing
+        self.chat_window.clear() # Clear existing content before updating
+        for message in self.messages:
+            self.display_message(message['role'], message['content'])
 
     def update_status_bar(self):
         """Updates the status bar with session information."""
         last_message_input_cost = calculate_cost(self.last_input_tokens, INPUT_PRICING)
         last_message_output_cost = calculate_cost(self.last_output_tokens, OUTPUT_PRICING)
-        message = ( # TODO: Use a permanent widget for this, color code
+        message = ( 
             f"Session Cost: ${self.session_cost:.5f} | "
             f"Last Message: Input: {self.last_input_tokens} tokens, ${last_message_input_cost:.5f}, "
             f"Output: {self.last_output_tokens} tokens, ${last_message_output_cost:.5f}"
@@ -698,6 +706,8 @@ class MainWindow(QMainWindow):
 
             self.chat = self.model.start_chat()
             self.system_instruction_tokens = self.model.count_tokens(" ").total_tokens
+            self.load_system_instructions() # Update system instructions if needed
+            self.system_message_displayed = True # Resetting this here
 
         except InvalidArgument as e:
             if "API key not valid" in str(e):
@@ -720,7 +730,6 @@ class MainWindow(QMainWindow):
                 self.display_message("Error", f"An error occurred: {e}")
                 raise e # Re-raise the exception for other InvalidArgument errors
 
-
     def display_loaded_settings(self):
         """Displays the loaded settings in the chat window."""
         if DEBUG:
@@ -734,15 +743,190 @@ class MainWindow(QMainWindow):
             print("Max Output Tokens:", self.max_output_tokens, tag="DEBUG", tag_color="cyan", color="white")
             print("Stop Sequences:", self.stop_sequences, tag="DEBUG", tag_color="cyan", color="white")
 
-        self.display_message("Using Model", self.model_name)
-        self.display_message("System Instructions", self.system_instructions)
-        self.display_message("Safety Level", self.safety_level)
-        self.display_message("Timeout", self.timeout)
-        self.display_message("Project Directory", self.project_dir)
-        self.display_message("Ignored Extensions", self.ignored_extensions)
-        self.display_message("Temperature", self.temperature)
-        self.display_message("Max Output Tokens", self.max_output_tokens)
-        self.display_message("Stop Sequences", self.stop_sequences)
+        #No need to display these in the chat window
+        #self.display_message("Using Model", self.model_name)
+        #self.display_message("System Instructions", self.system_instructions)
+        #self.display_message("Safety Level", self.safety_level)
+        #self.display_message("Timeout", self.timeout)
+        #self.display_message("Project Directory", self.project_dir)
+        #self.display_message("Ignored Extensions", self.ignored_extensions)
+        #self.display_message("Temperature", self.temperature)
+        #self.display_message("Max Output Tokens", self.max_output_tokens)
+        #self.display_message("Stop Sequences", self.stop_sequences)
+
+    def clear_chat_history(self):
+        """Clears the chat history for the current session."""
+        if (
+            QMessageBox.question(
+                self,
+                "Confirm Clear",
+                "Are you sure you want to clear the chat history?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            == QMessageBox.StandardButton.Yes
+        ):
+            self.chat_history.clear()  # Clear the chat history 
+            self.messages.clear()  # Clear the messages list
+            self.chat = self.model.start_chat() # Start a fresh chat
+            self.total_input_tokens = 0
+            self.total_output_tokens = 0
+            self.last_input_tokens = 0
+            self.last_output_tokens = 0
+            self.session_cost = 0.00
+            self.update_chat_window()  # Update the chat window
+            self.update_status_bar()  # Update the status bar
+
+
+class SettingsDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Configuration")
+        self.setGeometry(200, 200, 600, 400)
+
+        # Layout
+        layout = QVBoxLayout(self)
+
+        # Model Selection
+        self.model_label = QLabel("Model:")
+        self.model_combo = QComboBox(self)
+        self.model_combo.addItems(["gemini-1.5-pro-latest", "gemini-1.5-pro", "gemini-1.5-flash"]) # Add more models as needed
+        layout.addWidget(self.model_label)
+        layout.addWidget(self.model_combo)
+
+        # Safety Level Selection
+        self.safety_label = QLabel("Safety Level:")
+        self.safety_combo = QComboBox(self)
+        self.safety_combo.addItems(["None", "Low", "Medium", "High"])
+        layout.addWidget(self.safety_label)
+        layout.addWidget(self.safety_combo)
+
+        # Timeout
+        self.timeout_label = QLabel("Timeout (seconds):")
+        self.timeout_spin = QSpinBox(self)
+        self.timeout_spin.setMinimum(1)
+        self.timeout_spin.setMaximum(600)  # Set a reasonable maximum timeout
+        self.timeout_spin.setSingleStep(10)
+
+        layout.addWidget(self.timeout_label)
+        layout.addWidget(self.timeout_spin)
+
+        # Project Directory
+        self.project_dir_label = QLabel("Project Directory:")
+        self.project_dir_edit = QLineEdit(self)
+        self.project_dir_button = QPushButton("Browse", self)
+        self.project_dir_button.clicked.connect(self.browse_project_dir)
+        project_dir_layout = QHBoxLayout()
+        project_dir_layout.addWidget(self.project_dir_edit)
+        project_dir_layout.addWidget(self.project_dir_button)
+        layout.addWidget(self.project_dir_label)
+        layout.addLayout(project_dir_layout)
+
+        # Ignored Extensions
+        self.ignored_extensions_label = QLabel("Ignored Extensions and/or Files (comma-separated):")
+        self.ignored_extensions_edit = QLineEdit(self)
+        layout.addWidget(self.ignored_extensions_label)
+        layout.addWidget(self.ignored_extensions_edit)
+
+        # Temperature
+        self.temperature_label = QLabel("Temperature:")
+        self.temperature_spin = QDoubleSpinBox(self)
+        self.temperature_spin.setMinimum(0.0)
+        self.temperature_spin.setMaximum(2.0)
+        self.temperature_spin.setSingleStep(0.1)
+        layout.addWidget(self.temperature_label)
+        layout.addWidget(self.temperature_spin)
+
+        # Max Output Tokens
+        self.max_output_tokens_label = QLabel("Max Output Tokens:")
+        self.max_output_tokens_spin = QSpinBox(self)
+        self.max_output_tokens_spin.setMinimum(1)
+        self.max_output_tokens_spin.setMaximum(8192)
+        self.max_output_tokens_spin.setSingleStep(10)
+        layout.addWidget(self.max_output_tokens_label)
+        layout.addWidget(self.max_output_tokens_spin)
+
+        # Stop Sequences (You might want to use a QLineEdit for this if you're not using a fixed set)
+        self.stop_sequences_label = QLabel("Stop Sequences (comma-separated):")
+        self.stop_sequences_edit = QLineEdit(self)
+        layout.addWidget(self.stop_sequences_label)
+        layout.addWidget(self.stop_sequences_edit)
+
+        # System Instructions
+        self.system_instructions_label = QLabel("System Instructions:")
+        self.system_instructions_edit = QTextEdit(self) # Using QTextEdit to allow multiline input
+        layout.addWidget(self.system_instructions_label)
+        layout.addWidget(self.system_instructions_edit)
+
+        # Buttons
+        button_box = QHBoxLayout()
+        self.save_button = QPushButton("Save", self)
+        self.save_button.clicked.connect(self.accept)
+        button_box.addWidget(self.save_button)
+        self.cancel_button = QPushButton("Cancel", self)
+        self.cancel_button.clicked.connect(self.reject)
+        button_box.addWidget(self.cancel_button)
+        layout.addLayout(button_box)
+
+        self.load_settings() # Load and update the UI with saved settings
+    
+    def browse_project_dir(self):
+        """Opens a directory dialog to select the project directory."""
+        options = QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks
+        directory = QFileDialog.getExistingDirectory(self, "Select Project Directory", "", options=options)
+        if directory:
+            self.project_dir_edit.setText(directory)
+    
+    def load_settings(self):
+        """Load settings from the config file."""
+        config_file = os.path.join(SCRIPT_DIR, 'config.json') # Get the path to config.json
+        try:
+            with open(config_file, 'r') as f:
+                config = json.load(f)
+                # Update UI widgets with loaded settings
+                self.model_combo.setCurrentText(config.get('model', self.parent().model_name))
+                self.safety_combo.setCurrentText(config.get('safety', self.parent().safety_level).capitalize()) # Capitalize for display
+                self.timeout_spin.setValue(config.get('timeout', self.parent().timeout))
+                self.project_dir_edit.setText(config.get('project_directory', self.parent().project_dir))
+                self.ignored_extensions_edit.setText(", ".join(config.get('ignored_extensions', self.parent().ignored_extensions)))
+                self.temperature_spin.setValue(config.get('temperature', self.parent().temperature))
+                self.max_output_tokens_spin.setValue(config.get('max_output_tokens', self.parent().max_output_tokens))
+                self.stop_sequences_edit.setText(", ".join(config.get('stop_sequences', self.parent().stop_sequences)))
+                self.system_instructions_edit.setPlainText(config.get('system_instructions', self.parent().system_instructions)) # Use setPlainText for QTextEdit
+        except FileNotFoundError:
+            # Handle case where file doesn't exist (e.g., first time running)
+            QMessageBox.warning(self, "Warning", "Configuration file not found. Using default settings.")
+        except Exception as e:
+            # Handle other potential errors during file loading
+            QMessageBox.critical(self, "Error", f"An error occurred while loading the settings: {e}")
+
+    def save_settings(self):
+        """Save settings to config.json."""
+        config_file = os.path.join(SCRIPT_DIR, 'config.json')
+        try:
+            # Get the current settings from the UI elements
+            config = {
+                'model': self.model_combo.currentText(),
+                'system_instructions': self.system_instructions_edit.toPlainText(), # Get text from QTextEdit
+                'safety': self.safety_combo.currentText().lower(),
+                'timeout': self.timeout_spin.value(),
+                'project_directory': self.project_dir_edit.text(),
+                'ignored_extensions': [x.strip() for x in self.ignored_extensions_edit.text().split(",")],
+                'temperature': self.temperature_spin.value(),
+                'max_output_tokens': self.max_output_tokens_spin.value(),
+                'stop_sequences': [x.strip() for x in self.stop_sequences_edit.text().split(",")] 
+            }
+            with open(config_file, 'w') as f:
+                json.dump(config, f, indent=4)
+            # You might want to inform the user that the save was successful
+            QMessageBox.information(self, "Success", "Settings saved successfully.")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"An error occurred while saving the settings: {e}")
+
+    def accept(self):
+        """Save settings when the dialog is accepted."""
+        self.save_settings()
+        super().accept()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
