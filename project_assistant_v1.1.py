@@ -311,30 +311,42 @@ class MainWindow(QMainWindow): # TODO: Catch exit and ask if they need to save
     
     def add_files_to_context(self): # TODO: Add functionality for ignored files and file extensions, add ability to send in project file structure.
         """Adds files to the chat context."""
-        if self.project_dir is None:
-            self.display_message("Error", 'Project directory not set in config file. Cannot add files.')
-            return
 
         file_dialog = QFileDialog()
         file_dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
-        file_dialog.setDirectory(self.project_dir)  
+        if self.project_dir:
+            file_dialog.setDirectory(self.project_dir)
+        else:
+            if os.path.exists(os.path.expanduser("~")):
+                file_dialog.setDirectory(os.path.expanduser("~"))
+            else:
+                self.display_message("Error", "Set the project directory to add files to the context.")
 
-        if file_dialog.exec():
+        if file_dialog.exec(): # TODO: Force file dialog to open in front of chat window
             selected_files = file_dialog.selectedFiles()
-            context = "\n".join(
-                [
-                    f"File and content provided for context: \n{file}\n```\n{open(file, 'r', errors='ignore').read()}\n```"
-                    for file in selected_files
-                ]
-            )
-            self.display_message("Files", context)  
+            messages_to_display = []
+            files_context = "Files from the user: "
+            for file in selected_files:
+                try:
+                    with open(file, 'r', errors='ignore') as f:
+                        content = f.read()
+                        files_context += ('```' + content + '```\n') # TODO: Should add filepath before content
+                        messages_to_display.append(f"{file} was sent to model.")  # Display only the file path
+                except Exception as e:
+                    self.display_message("Error", f"Error reading file {file}: {e}")
+            
+            files_context += '\nUser message: '
 
             # Get additional user input after adding files
+            # TODO: Change ok button to say send
             user_message, ok = QInputDialog.getMultiLineText(
                 self, "Input", "Enter your message:"
             )
             if ok and user_message:
-                self.send_message_to_model(context + "\nUser Input: " + user_message, self.timeout)
+                for message in messages_to_display:
+                    self.display_message('File', message)
+                # TODO: Create a seperate function for sending files and user message, so that files arent displayed in chat, we can pass files context and user message seperately, and only display user message
+                self.send_message_to_model((files_context + user_message), self.timeout)  # Send the user message to the model
 
     def display_chat_history(self):
         """Displays a concise chat history in a larger message box."""
@@ -541,13 +553,50 @@ class MainWindow(QMainWindow): # TODO: Catch exit and ask if they need to save
         # File Menu
         file_menu = menu_bar.addMenu("File")
 
-        open_action = QAction("Load History Into Current Session", self)
-        open_action.triggered.connect(self.load_chat_history)
-        file_menu.addAction(open_action)
+        load_action = QAction("Load History Into Current Session", self)
+        load_action.setShortcut("Ctrl+L") # TODO: Fix, opens file dialog behind chat window, even though save doesn't
+        load_action.triggered.connect(self.load_chat_history)
+        file_menu.addAction(load_action)
 
         save_action = QAction("Save Chat History", self)
+        save_action.setShortcut("Ctrl+S")
         save_action.triggered.connect(self.save_chat_history)
         file_menu.addAction(save_action)
+
+        # TODO: Save entire session chat history (need to track session history seperately from chat history)
+
+        # **Tools Menu**
+        tools_menu = menu_bar.addMenu("Tools")
+        
+        delete_action = QAction("Delete Messages", self)
+        delete_action.setShortcut("Ctrl+D")
+        delete_action.triggered.connect(self.delete_messages)
+        tools_menu.addAction(delete_action)
+
+        files_action = QAction("Add Files to Context", self)
+        files_action.setShortcut("Ctrl+F")
+        files_action.triggered.connect(self.add_files_to_context)
+        tools_menu.addAction(files_action)
+        
+        history_action = QAction("Display Chat History", self)
+        history_action.setShortcut("Ctrl+H")
+        history_action.triggered.connect(self.display_chat_history)
+        tools_menu.addAction(history_action)
+
+        view_action = QAction("View Full Message", self)
+        view_action.setShortcut("Ctrl+M")
+        view_action.triggered.connect(self.view_full_message)
+        tools_menu.addAction(view_action)
+
+        timeout_action = QAction("Set Timeout", self)
+        timeout_action.setShortcut("Ctrl+T")
+        timeout_action.triggered.connect(self.set_timeout)
+        tools_menu.addAction(timeout_action)
+
+        clear_action = QAction("Clear Chat History", self)
+        clear_action.setShortcut("Ctrl+R")
+        clear_action.triggered.connect(self.clear_chat_history)
+        tools_menu.addAction(clear_action)
 
         # Settings Menu
         settings_menu = menu_bar.addMenu("Settings")
@@ -559,33 +608,6 @@ class MainWindow(QMainWindow): # TODO: Catch exit and ask if they need to save
         config_action = QAction("Configuration", self)
         config_action.triggered.connect(self.configure_settings)
         settings_menu.addAction(config_action)
-
-        # **Tools Menu**
-        tools_menu = menu_bar.addMenu("Tools")
-        
-        delete_action = QAction("Delete Messages", self)
-        delete_action.triggered.connect(self.delete_messages)
-        tools_menu.addAction(delete_action)
-
-        files_action = QAction("Add Files to Context", self)
-        files_action.triggered.connect(self.add_files_to_context)
-        tools_menu.addAction(files_action)
-        
-        history_action = QAction("Display Chat History", self)
-        history_action.triggered.connect(self.display_chat_history)
-        tools_menu.addAction(history_action)
-
-        view_action = QAction("View Full Message", self)
-        view_action.triggered.connect(self.view_full_message)
-        tools_menu.addAction(view_action)
-
-        timeout_action = QAction("Set Timeout", self)
-        timeout_action.triggered.connect(self.set_timeout)
-        tools_menu.addAction(timeout_action)
-
-        clear_action = QAction("Clear Chat History", self)
-        clear_action.triggered.connect(self.clear_chat_history)
-        tools_menu.addAction(clear_action)
 
         # Help Menu
         help_menu = menu_bar.addMenu("Help")
