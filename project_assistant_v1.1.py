@@ -688,7 +688,7 @@ class MainWindow(QMainWindow):
             self.display_message(message['role'], message['content'])
 
     def update_status_bar(self):
-        """Updates the status bar with session information."""
+        """Updates the status bar with session information.""" # TODO: Make permanent widget instead of message so it doesn't clear when hovering over menu bar.
         last_message_input_cost = calculate_cost(self.last_input_tokens, INPUT_PRICING, self.messages)
         last_message_output_cost = calculate_cost(self.last_output_tokens, OUTPUT_PRICING, self.messages)
         message = ( 
@@ -812,14 +812,7 @@ class MainWindow(QMainWindow):
         ):
             self.chat_history.clear()  # Clear the chat history 
             self.messages.clear()  # Clear the messages list
-            self.chat = self.model.start_chat() # Start a fresh chat
-            ''' TODO: Ask if the user wants to clear the session cost
-            self.total_input_tokens = 0
-            self.total_output_tokens = 0
-            self.last_input_tokens = 0
-            self.last_output_tokens = 0
-            self.session_cost = 0.00
-            '''
+            self.chat.history.clear() # Start a fresh chat
             self.update_chat_window()  # Update the chat window
             self.update_status_bar()  # Update the status bar
 
