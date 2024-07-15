@@ -168,7 +168,6 @@ class MainWindow(QMainWindow):
         self.create_status_bar()
 
         # Load system instructions
-        self.load_system_instructions()
         self.display_message("Welcome", "Welcome to Gemini Project Assistant!")
 
 
@@ -184,8 +183,41 @@ class MainWindow(QMainWindow):
         # Display settings after UI setup
         self.display_loaded_settings()
 
+        # Display Warnings and User Agreement
+        self.show_warnings_and_agreement()
+
         # Initialize the model
         self.initialize_model()
+    
+    def show_warnings_and_agreement(self):
+        """Displays warnings and the user agreement, asking for acceptance."""
+
+        # Formatted Warnings with HTML for line breaks 
+        warnings_text = WARNINGS.replace('\n', '<br>') 
+
+        # Create a message box for warnings
+        warning_msg = QMessageBox(self)
+        warning_msg.setIcon(QMessageBox.Icon.Warning)
+        warning_msg.setWindowTitle("Important Warnings")
+        warning_msg.setText(warnings_text)
+        warning_msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+        warning_msg.exec()
+
+        # Ask for user agreement
+        agreement_text = (
+            "By continuing, you take full responsibility for your use of this application.<br><br>"
+            "Do you accept the terms and conditions?"
+        )
+        reply = QMessageBox.question(
+            self,
+            "User Agreement", 
+            agreement_text,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No # Set "No" as the default
+        )
+
+        if reply == QMessageBox.StandardButton.No:
+            QApplication.quit() # Close the application if the user rejects the agreement
 
     def send_message(self):
         """Sends the user's message to the Gemini model and handles the response."""
@@ -623,9 +655,8 @@ class MainWindow(QMainWindow):
     def load_system_instructions(self):
         """Loads and displays the system instructions."""
         if self.model and not self.system_message_displayed:
-            system_instructions = self.model._system_instruction # Access using _system_instruction
             si_tokens = self.model.count_tokens(" ").total_tokens
-            self.display_message("System Instructions", system_instructions)
+            self.display_message("System Instructions", self.system_instructions)
             self.display_message("Tokens", si_tokens)
             self.display_message("Cost", f"${calculate_cost(si_tokens, INPUT_PRICING):.5f}")
             self.system_message_displayed = True 
