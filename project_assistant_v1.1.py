@@ -3,20 +3,22 @@ import os
 import json
 from print_color import print
 import google.generativeai as genai
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
-from google.api_core.exceptions import DeadlineExceeded
+from google.api_core.exceptions import DeadlineExceeded, InvalidArgument
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QLabel, QVBoxLayout, QLineEdit, QMessageBox, QFileDialog, QTextEdit, QFontDialog, QColorDialog, QInputDialog, QListWidget, QStatusBar
 from PyQt6.QtCore import Qt, QSize, QEvent
 from PyQt6.QtGui import QFont, QColor, QAction
 
 DEBUG = True  # Set to True to enable debug messages
 
-# Load the environment variables from the .env file
-load_dotenv()
+# Calculate the .env file path
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ENV_FILE = os.path.join(SCRIPT_DIR, '.env')
 
-# Load the environment variables
-API_KEY = os.getenv('API_KEY') # The API key
+# Load environment variables once at the start
+load_dotenv(dotenv_path=ENV_FILE) 
+API_KEY = os.getenv('API_KEY')
 
 # Gemini Safety Settings - for more info visit https://ai.google.dev/gemini-api/docs/safety-settings
 #  No safety settings
@@ -139,7 +141,7 @@ class MainWindow(QMainWindow):
         self.project_dir = None
         self.ignored_extensions = []
         self.chat_history = []  # Stores message content for display
-        self.all_messages = [] # Stores detailed message data (including tokens, cost) - used for saving history
+        self.messages = [] # Stores detailed message data (including tokens, cost) - used for saving history
         self.model = None
         self.chat = None
         self.model_name = 'gemini-1.5-pro-latest'
@@ -150,15 +152,6 @@ class MainWindow(QMainWindow):
         self.safety_level = 'medium' # default
         self.safety_settings = MEDIUM_SAFETY
         self.system_message_displayed = False
-
-        # Load Configuration and API Key
-        self.load_config()  
-        self.load_api_key()
-        self.generation_config = {
-            "temperature": self.temperature,
-            "max_output_tokens": self.max_output_tokens,
-            "stop_sequences": self.stop_sequences
-        }
 
         # Create UI elements
         self.central_widget = QWidget()
@@ -175,6 +168,16 @@ class MainWindow(QMainWindow):
         # Load system instructions
         self.load_system_instructions()
         self.display_message("Welcome", "Welcome to Gemini Project Assistant!")
+
+
+        # Load Configuration and API Key
+        self.load_config()  
+        self.load_api_key()
+        self.generation_config = {
+            "temperature": self.temperature,
+            "max_output_tokens": self.max_output_tokens,
+            "stop_sequences": self.stop_sequences
+        }
 
         # Display settings after UI setup
         self.display_loaded_settings()
@@ -251,14 +254,14 @@ class MainWindow(QMainWindow):
                 for i in message_indices:
                     # Adjust for zero-based indexing and user-visible indexing (starting from 1)
                     python_index = i - 1
-                    if 0 <= python_index < len(self.all_messages):  
+                    if 0 <= python_index < len(self.messages):  
                         if DEBUG:
                             print(f"DEBUG: Deleting message at index: {i} (python_index: {python_index})", tag="DEBUG", tag_color="cyan", color="white")
-                            print(f"DEBUG: all_messages before deletion: {self.all_messages}", tag="DEBUG", tag_color="cyan", color="white")
-                        deleted_message = self.all_messages.pop(python_index)
+                            print(f"DEBUG: all_messages before deletion: {self.messages}", tag="DEBUG", tag_color="cyan", color="white")
+                        deleted_message = self.messages.pop(python_index)
                         if DEBUG:
                             print(f"DEBUG: Deleted message: {deleted_message}", tag="DEBUG", tag_color="cyan", color="white")
-                            print(f"DEBUG: all_messages after deletion: {self.all_messages}", tag="DEBUG", tag_color="cyan", color="white")
+                            print(f"DEBUG: all_messages after deletion: {self.messages}", tag="DEBUG", tag_color="cyan", color="white")
                         if DEBUG:
                             print(f"DEBUG: chat.history before deletion: {self.chat.history}", tag="DEBUG", tag_color="cyan", color="white")
                         del self.chat.history[python_index]
@@ -268,7 +271,7 @@ class MainWindow(QMainWindow):
                     else:
                         self.display_message("Error", f"Invalid message index: {i}")
                 # Refresh the chat history after deleting
-                self.chat_history = [f"<span style='color:#00ff00;'><strong>You:</strong></span> {m['content']}<br>" if m['role'] == "User" else f"<span style='color:cyan;'><strong>Model:</strong></span> {m['content']}<br>" for m in self.all_messages] 
+                self.chat_history = [f"<span style='color:#00ff00;'><strong>You:</strong></span> {m['content']}<br>" if m['role'] == "User" else f"<span style='color:cyan;'><strong>Model:</strong></span> {m['content']}<br>" for m in self.messages] 
                 self.update_chat_window()
             except ValueError:
                 self.display_message("Error", "Invalid input. Enter message indices as comma-separated numbers.")
@@ -303,7 +306,7 @@ class MainWindow(QMainWindow):
     def display_chat_history(self):
         """Displays a concise chat history in a larger message box."""
         history_text = []
-        for i, m in enumerate(self.all_messages):
+        for i, m in enumerate(self.messages):
             # Calculate message content preview, removing newlines
             content_preview = m['content'][:75] + ' ... ' + m['content'][-75:] if len(m['content']) > 150 else m['content']
             content_preview = content_preview.replace('\n', ' ')
@@ -342,7 +345,7 @@ class MainWindow(QMainWindow):
 
             # Add messages to history for display and saving BEFORE sending the request
             self.chat_history.append(f"<span style='color:#00ff00;'><strong>You:</strong></span> {message}<br>")
-            self.all_messages.append({"role": "User", "content": message, "tokens": input_tokens}) # Store message in all_messages
+            self.messages.append({"role": "User", "content": message, "tokens": input_tokens}) # Store message in all_messages
             self.update_chat_window()
 
             if DEBUG:
@@ -367,7 +370,7 @@ class MainWindow(QMainWindow):
 
             # Add Model response to chat history
             self.chat_history.append(f"<span style='color:cyan;'><strong>Model:</strong></span> {response.text}<br>") 
-            self.all_messages.append({"role": "Model", "content": response.text, "tokens": self.last_output_tokens}) # Store message in all_messages
+            self.messages.append({"role": "Model", "content": response.text, "tokens": self.last_output_tokens}) # Store message in all_messages
             self.update_chat_window()
 
             # Update session cost 
@@ -402,6 +405,14 @@ class MainWindow(QMainWindow):
 
     def load_chat_history(self):
         """Opens a dialog to load chat history from a file."""
+         # Display a warning message box
+        warning_msg = QMessageBox(self)
+        warning_msg.setIcon(QMessageBox.Icon.Warning)
+        warning_msg.setWindowTitle("File Type Warning")
+        warning_msg.setText("Warning: Only select '.json' files generated by this application!")
+        warning_msg.setStandardButtons(QMessageBox.StandardButton.Ok)  # Only an "OK" button
+        warning_msg.exec()
+
         file_dialog = QFileDialog()
         file_dialog.setNameFilter("Chat History (*.json)")
         if file_dialog.exec():
@@ -415,7 +426,7 @@ class MainWindow(QMainWindow):
                         role = message_data['role']
                         content = message_data['content']
                         tokens = message_data.get('tokens', 0) # Get tokens, default to 0 if not present in older files
-                        self.all_messages.append({"role": role, "content": content, "tokens": tokens})
+                        self.messages.append({"role": role, "content": content, "tokens": tokens})
                         self.chat_history.append(f"<span style='color:#00ff00;'><strong>You:</strong></span> {content}<br>" if role == "User" else f"<span style='color:cyan;'><strong>Model:</strong></span> {content}<br>")
                         self.chat.history.append({'parts': [{'text': content}], 'role': role.lower()})
                     self.update_chat_window()
@@ -425,9 +436,18 @@ class MainWindow(QMainWindow):
                 self.display_message("Error", f"Error loading chat history: {e}")
 
     def save_chat_history(self):
+        # Display an information message box about file formats
+        format_info_msg = QMessageBox(self)
+        format_info_msg.setIcon(QMessageBox.Icon.Information)
+        format_info_msg.setWindowTitle("Save Format Information")
+        format_info_msg.setText("You can save in '.json', '.txt', '.md', or '.csv' formats, "
+                                "but this application can only load '.json' files.")
+        format_info_msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+        format_info_msg.exec()  # Wait for the user to acknowledge
+
         """Opens a dialog to save chat history to a file."""
         file_dialog = QFileDialog(self)
-        file_dialog.setNameFilter("*.json *.txt *.md *.csv")  # Allow multiple file types
+        file_dialog.setNameFilter("Chat History (*.json *.txt *.md *.csv)")  # Allow multiple file types
         file_dialog.setDefaultSuffix(".json")  # Set default to JSON
         file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
 
@@ -448,13 +468,13 @@ class MainWindow(QMainWindow):
                                     "tokens": self.system_instruction_tokens,
                                     "cost": calculate_cost(self.system_instruction_tokens, INPUT_PRICING) # Calculate the cost of the system instructions
                                 },
-                                "chat_history": self.all_messages
+                                "chat_history": self.messages
                             }
                             json.dump(data, f, indent=4)
                         case ".txt":
                             f.write(f"Total session cost: ${self.session_cost:.5f}\n\n")
                             f.write(f"0. System Instructions, {self.system_instruction_tokens} tokens - {self.system_instructions}\n") # System instructions at index 0
-                            for i, m in enumerate(self.all_messages):
+                            for i, m in enumerate(self.messages):
                                 f.write(f"{i+1}. {m['role']}, {m['tokens']} tokens - {m['content']}\n")
                         case ".md":
                             f.write(f"# Total session cost: ${self.session_cost:.5f}\n\n")
@@ -463,7 +483,7 @@ class MainWindow(QMainWindow):
                             f.write(f"{self.system_instructions}\n\n")
                             f.write("---\n")
                             f.write("# Chat History\n")
-                            for i, m in enumerate(self.all_messages):
+                            for i, m in enumerate(self.messages):
                                 f.write(f"### {i+1}. {m['role']}, {m['tokens']} tokens\n")
                                 f.write(f"{m['content']}\n\n")
                                 f.write("---\n")
@@ -471,7 +491,7 @@ class MainWindow(QMainWindow):
                             f.write(f'Session Cost:,{self.session_cost:.5f}\n')
                             f.write("Role,Tokens,Content\n")
                             f.write(f"System Instructions,{self.system_instruction_tokens},\"{self.system_instructions}\"\n") # System instructions on the first line
-                            for m in self.all_messages:
+                            for m in self.messages:
                                 f.write(f"{m['role']},{m['tokens']},\"{m['content']}\"\n") 
                         case _:
                             raise ValueError("Invalid file format")
@@ -535,22 +555,60 @@ class MainWindow(QMainWindow):
         self.update_status_bar()
 
     def load_api_key(self):
-        """Loads the API key from the .env file."""
+        """Loads the API key from the .env file. If not found,
+        it prompts the user to set it.
+        """
         global API_KEY
         if not API_KEY:
             self.set_api_key()  # Prompt for API key if not found
+        else:
+            self.display_message('API Key', 'API Key loaded from .env')
 
     def set_api_key(self):
-        """Prompts the user to enter and save their API key.""" # TODO: User only needs to do this if they don't have it set in the .env or they want to change it
+        """Prompts the user to enter and save their API key, with a warning
+        if an API key is already present in the .env file.
+        """
         global API_KEY
-        api_key, ok = QInputDialog.getText(self, "API Key", "Enter your Google Gemini API Key:")
+
+        # Check if an API key is already set in the .env file
+        load_dotenv(dotenv_path=ENV_FILE)
+        existing_api_key = os.getenv("API_KEY")
+
+        if existing_api_key and not self.api_key_invalid:
+            # Warn the user about overwriting the existing API key
+            warning_message = (
+                "An API key is already set in the '.env' file.\n"
+                "Entering a new key will overwrite the existing one.\n"
+                "You will need to restart the application for the changes to take effect.\n\n"
+                "Do you want to continue?"
+            )
+
+            reply = QMessageBox.question(
+                self,
+                "API Key Already Set",
+                warning_message,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,  # Set default to 'No'
+            )
+
+            if reply == QMessageBox.StandardButton.No:
+                return  # Don't proceed with setting a new key
+
+        api_key, ok = QInputDialog.getText(
+            self,
+            "API Key",
+            "Enter your Google Gemini API Key (https://aistudio.google.com/app/u/1/apikey):",
+        )
         if ok and api_key:
             API_KEY = api_key
-            self.display_message("API Key", "API Key set successfully. Restart the application.")
-            # TODO: Save api key in .env
-        else:
-            self.display_message("API Key", "API Key not set. Attempting to revert to .env setting.")
-            API_KEY = os.getenv('API_KEY')
+            set_key(ENV_FILE, "API_KEY", API_KEY)
+            self.display_message(
+                "API Key", "API Key set successfully. You may have to restart the application."
+            )
+        elif not ok:
+            self.display_message(
+                "API Key", "API Key not set. Using the existing key from .env."
+            )
     
     def configure_settings(self):
         """Allows the user to configure application settings."""
@@ -583,8 +641,7 @@ class MainWindow(QMainWindow):
 
     def load_config(self):
         """Loads configuration settings from a JSON file."""
-        script_dir = os.path.dirname(__file__)
-        config_file = os.path.join(script_dir, 'config.json')
+        config_file = os.path.join(SCRIPT_DIR, 'config.json')
 
         try:
             with open(config_file, 'r') as f:
@@ -625,19 +682,43 @@ class MainWindow(QMainWindow):
             self.display_message("Error", f"An error occurred loading configuration: {e}")
 
     def initialize_model(self):
-        """Initializes the Gemini model with the loaded settings."""
-        genai.configure(api_key=API_KEY)
+        """Initializes the Gemini model with the loaded settings, 
+        handling InvalidArgument exceptions for invalid API keys.
+        """
+        global API_KEY
+        try:
+            genai.configure(api_key=API_KEY) 
 
-        self.model = genai.GenerativeModel(
+            self.model = genai.GenerativeModel(
                 model_name=self.model_name,
                 generation_config=self.generation_config,
                 safety_settings=self.safety_settings,
                 system_instruction=self.system_instructions,
             )
-        
-        self.chat = self.model.start_chat()
-        # Calculate and store system instruction tokens when the model is initialized
-        self.system_instruction_tokens = self.model.count_tokens(" ").total_tokens 
+
+            self.chat = self.model.start_chat()
+            self.system_instruction_tokens = self.model.count_tokens(" ").total_tokens
+
+        except InvalidArgument as e:
+            if "API key not valid" in str(e):
+                reply = QMessageBox.critical(
+                    self,
+                    "Invalid API Key",
+                    "The API key you provided is invalid.\n"
+                    "Would you like to try entering a new one or quit the application?",
+                    QMessageBox.StandardButton.Retry | QMessageBox.StandardButton.Close,
+                    QMessageBox.StandardButton.Retry  # Set Retry as the default button
+                )
+
+                if reply == QMessageBox.StandardButton.Retry:
+                    self.api_key_invalid = True
+                    self.set_api_key()  # Prompt the user to enter a new API key
+                    self.initialize_model() # Retry initializing the model after setting a new key
+                else:
+                    sys.exit()  # Close the application if the user chooses to quit
+            else:
+                self.display_message("Error", f"An error occurred: {e}")
+                raise e # Re-raise the exception for other InvalidArgument errors
 
 
     def display_loaded_settings(self):
