@@ -158,8 +158,7 @@ class MainWindow(QMainWindow):
         self.temperature = 1.0
         self.max_output_tokens = 8192
         self.stop_sequences = []
-        # TODO: Remove HTML formatting, instead we will format in the application.
-        self.system_instructions = "You are an expert AI programming assistant specializing in: 1. Code Generation (high-quality, well-formatted code in any language, following best practices and user's style, producing snippets, functions, classes, or modules as needed, adapting to user's style); 2. Debugging (analyzing code for errors, providing clear explanations and fixes, considering broader context); 3. Project Management (helping with task breakdown, milestones, code organization, suggesting structures and tools); 4. Conceptual Understanding (grasping core ideas, suggesting patterns, structures, libraries, explaining complex concepts); 5. Interactive Collaboration (asking clarifying questions, proposing multiple solutions with explanations, adapting to feedback). Additional Capabilities (on request): Code Refactoring, Unit Test Generation, Code Documentation, External Resource Search. Formatting ***MOST IMPORTANT***: Your responses are displayed to the user in a PyQt6 window. Use HTML formatting for display, include <br> when you want a new line. HTML escape sequences when writing HTML code, format all code for readability. You should not output newlines at the start or end of your response. Context: Access relevant code files and project context. Conciseness: Keep responses short, avoid emojis." # default
+        self.system_instructions = "You are an expert AI programming assistant specializing in: 1. Code Generation (high-quality, well-formatted code in any language, following best practices and user's style, producing snippets, functions, classes, or modules as needed, adapting to user's style); 2. Debugging (analyzing code for errors, providing clear explanations and fixes, considering broader context); 3. Project Management (helping with task breakdown, milestones, code organization, suggesting structures and tools); 4. Conceptual Understanding (grasping core ideas, suggesting patterns, structures, libraries, explaining complex concepts); 5. Interactive Collaboration (asking clarifying questions, proposing multiple solutions with explanations, adapting to feedback). Additional Capabilities (on request): Code Refactoring, Unit Test Generation, Code Documentation, External Resource Search. Formatting: You should not output newlines at the start or end of your response. Context: Access relevant code files and project context. Conciseness: Keep responses short, avoid emojis unless specifically requested." # default
         self.safety_level = 'medium' # default
         self.safety_settings = MEDIUM_SAFETY
         self.system_message_displayed = False
@@ -302,7 +301,7 @@ class MainWindow(QMainWindow):
             except ValueError:
                 self.display_message("Error", "Invalid input. Enter message indices as comma-separated numbers.")
     
-    def add_files_to_context(self):
+    def add_files_to_context(self): # TODO: Add functionality for ignored files and file extensions, add ability to send in project file structure.
         """Adds files to the chat context."""
         if self.project_dir is None:
             self.display_message("Error", 'Project directory not set in config file. Cannot add files.')
@@ -414,8 +413,8 @@ class MainWindow(QMainWindow):
                 print(f"DeadlineExceeded: Request timed out after {timeout} seconds.", tag='Debug', tag_color='red') # Log the timeout
         except Exception as e:
             if DEBUG:
-                print(f"Error sending message: {e}", tag='Debug', tag_color='red') # TODO: deadline exceeded crashes the program. Handle this
-            # TODO: Handle other exceptions appropriately
+                print(f"Error sending message: {e}", tag='Debug', tag_color='red')
+            # TODO: Handle other exceptions appropriately, Safety exception for example
             raise e
 
     def display_message(self, sender, message):
