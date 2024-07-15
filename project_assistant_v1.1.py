@@ -133,6 +133,7 @@ class MainWindow(QMainWindow):
         self.temperature = 1.0
         self.max_output_tokens = 8192
         self.stop_sequences = []
+        # TODO: Remove HTML formatting, instead we will format in the application.
         self.system_instructions = "You are an expert AI programming assistant specializing in: 1. Code Generation (high-quality, well-formatted code in any language, following best practices and user's style, producing snippets, functions, classes, or modules as needed, adapting to user's style); 2. Debugging (analyzing code for errors, providing clear explanations and fixes, considering broader context); 3. Project Management (helping with task breakdown, milestones, code organization, suggesting structures and tools); 4. Conceptual Understanding (grasping core ideas, suggesting patterns, structures, libraries, explaining complex concepts); 5. Interactive Collaboration (asking clarifying questions, proposing multiple solutions with explanations, adapting to feedback). Additional Capabilities (on request): Code Refactoring, Unit Test Generation, Code Documentation, External Resource Search. Formatting ***MOST IMPORTANT***: Your responses are displayed to the user in a PyQt6 window. Use HTML formatting for display, include <br> when you want a new line. HTML escape sequences when writing HTML code, format all code for readability. You should not output newlines at the start or end of your response. Context: Access relevant code files and project context. Conciseness: Keep responses short, avoid emojis." # default
         self.safety_level = 'medium' # default
         self.safety_settings = MEDIUM_SAFETY
@@ -172,6 +173,8 @@ class MainWindow(QMainWindow):
 
         # Initialize the model
         self.initialize_model()
+
+        # TODO: Display prcing information in the chat window
     
     def show_warnings_and_agreement(self):
         """Displays warnings and the user agreement, asking for acceptance."""
@@ -359,11 +362,15 @@ class MainWindow(QMainWindow):
             self.update_status_bar()
 
             return self.last_input_tokens, self.last_output_tokens, response.text
-
+        except DeadlineExceeded:
+            QMessageBox.warning(self, "Timeout", "The request to the Gemini API timed out. Try increasing the timeout setting or reducing the complexity of your request. You are not charged when this happens. Please note that this message was still added to history, so delete it if you wish.")
+            self.chat.history.append({'parts': [{'text': message}], 'role': 'user'})
+            if DEBUG:
+                print(f"DeadlineExceeded: Request timed out after {timeout} seconds.", tag='Debug', tag_color='red') # Log the timeout
         except Exception as e:
             if DEBUG:
                 print(f"Error sending message: {e}", tag='Debug', tag_color='red') # TODO: deadline exceeded crashes the program. Handle this
-            # Handle other exceptions appropriately
+            # TODO: Handle other exceptions appropriately
             raise e
 
     def display_message(self, sender, message):
