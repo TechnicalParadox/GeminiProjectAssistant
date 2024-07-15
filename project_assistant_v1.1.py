@@ -365,7 +365,7 @@ class MainWindow(QMainWindow):
             except IndexError:
                 self.display_message("Error", "Invalid message index.")
     
-    def send_message_to_model(self, message, timeout):
+    def send_message_to_model(self, message, timeout): # TODO: Handle other exceptions appropriately, Safety exception for example
         """Sends the message to the Gemini model and handles the response."""
         try:
             # Calculate token counts for the user's message and subtract system instructions tokens
@@ -414,7 +414,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             if DEBUG:
                 print(f"Error sending message: {e}", tag='Debug', tag_color='red')
-            # TODO: Handle other exceptions appropriately, Safety exception for example
             raise e
 
     def display_message(self, sender, message):
@@ -666,7 +665,7 @@ class MainWindow(QMainWindow):
                 "API Key", "API Key not set. Using the existing key from .env."
             )
 
-    def configure_settings(self):
+    def configure_settings(self): # TODO: If config.json doesn't exist, populate these with default values from init
         """Allows the user to configure application settings."""
         dialog = SettingsDialog(self) # Create an instance of the SettingsDialog
         if dialog.exec() == QDialog.accepted: # Use exec() instead of show() to run the dialog modally
@@ -687,8 +686,8 @@ class MainWindow(QMainWindow):
         for message in self.messages:
             self.display_message(message['role'], message['content'])
 
-    def update_status_bar(self):
-        """Updates the status bar with session information.""" # TODO: Make permanent widget instead of message so it doesn't clear when hovering over menu bar.
+    def update_status_bar(self): # TODO: Make permanent widget instead of message so it doesn't clear when hovering over menu bar.
+        """Updates the status bar with session information."""
         last_message_input_cost = calculate_cost(self.last_input_tokens, INPUT_PRICING, self.messages)
         last_message_output_cost = calculate_cost(self.last_output_tokens, OUTPUT_PRICING, self.messages)
         message = ( 
