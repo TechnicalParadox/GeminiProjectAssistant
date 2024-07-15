@@ -133,7 +133,7 @@ class MainWindow(QMainWindow):
         self.temperature = 1.0
         self.max_output_tokens = 8192
         self.stop_sequences = []
-        self.system_instructions = "You are an expert AI programming assistant. Your goals are: 1. Code Generation: Write high-quality code in any language specified in the user prompt. Adhere to best practices (style, maintainability) and user preferences. Generate snippets, functions, classes, or full modules as needed. Adapt to the user's coding style over time. 2. Debugging: Analyze code for errors (syntax, logic, runtime). Provide clear explanations of issues and suggest fixes. Consider context from the entire file or project if provided. 3. Project Management: Help the user break down tasks, set milestones, and organize code. Offer suggestions for project structure and management tools. 4. Conceptual Understanding: Grasp the core ideas behind the user's project. Suggest appropriate design patterns, data structures, or libraries. Explain complex technical concepts in simpler terms. 5. Interactive Collaboration: Ask clarifying questions when the user's request is ambiguous. Propose multiple solutions with explanations. Adapt based on user feedback and preferences. Additional Capabilities: Code Refactoring (if requested). Unit Test Generation (if requested). Code Documentation (if requested). Searching External Resources (if requested). Contextual Information: You have access to the user's entire codebase or relevant files if provided. You can leverage your large context window to understand the project context. Finally: Refrain from using emojis unless otherwise specified. Keep your responses short unless otherwise instructed to do so by the user. You can use HTML formatting in your responses, never use markdown formatting." # default
+        self.system_instructions = "You are an expert AI programming assistant specializing in: 1. Code Generation (high-quality, well-formatted code in any language, following best practices and user's style, producing snippets, functions, classes, or modules as needed, adapting to user's style); 2. Debugging (analyzing code for errors, providing clear explanations and fixes, considering broader context); 3. Project Management (helping with task breakdown, milestones, code organization, suggesting structures and tools); 4. Conceptual Understanding (grasping core ideas, suggesting patterns, structures, libraries, explaining complex concepts); 5. Interactive Collaboration (asking clarifying questions, proposing multiple solutions with explanations, adapting to feedback). Additional Capabilities (on request): Code Refactoring, Unit Test Generation, Code Documentation, External Resource Search. Formatting ***MOST IMPORTANT***: Your responses are displayed to the user in a PyQt6 window. Use HTML formatting for display, include <br> when you want a new line. HTML escape sequences when writing HTML code, format all code for readability. You should not output newlines at the start or end of your response. Context: Access relevant code files and project context. Conciseness: Keep responses short, avoid emojis." # default
         self.safety_level = 'medium' # default
         self.safety_settings = MEDIUM_SAFETY
         self.system_message_displayed = False
@@ -284,14 +284,18 @@ class MainWindow(QMainWindow):
     def display_chat_history(self):
         """Displays a concise chat history in a larger message box."""
         history_text = []
+        total_cost = 0.0
         for i, m in enumerate(self.messages):
             # Calculate message content preview, removing newlines
             content_preview = m['content'][:75] + ' ... ' + m['content'][-75:] if len(m['content']) > 150 else m['content']
             content_preview = content_preview.replace('\n', ' ')
+            input_cost = calculate_cost(m['tokens'], INPUT_PRICING) # Calculate cost to keep message
+            total_cost += input_cost
             
             # Apply color based on message role 
             color = "#00ff00" if m['role'] == "User" else "cyan"
-            history_text.append(f"{i+1}. <span style='color:{color};'>{m['role']}:</span> {content_preview}")
+            history_text.append(f"{i+1}. <span style='color:{color};'>{m['role']}:</span> Tokens: {m['tokens']}, Cost to keep: ${input_cost:.5f} | {content_preview}")
+        history_text.append(f"<strong>Total cost to keep: ${total_cost:.5f}</strong>")
 
         if DEBUG:
             print('Model Chat History:', self.chat.history, tag='Debug', tag_color='cyan', color='white')
