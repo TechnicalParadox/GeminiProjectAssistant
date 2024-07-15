@@ -32,8 +32,8 @@ sudo apt install python3-xlib libx11-xcb-dev libxcb-cursor0 libxrender1 libxi6
 1. Ensure you have installed the necessary dependencies.
 2. Download the zip and extract files to the directory you wish to install in.
 3. Open installation directory.
-4. Create config.json to your specifications according to config.json-template.
-5. Create your .env file according to the .env-template.
+4. Create config.json to your specifications according to config.json-template. (Optional) This can be generated inside the application.
+5. Create your .env file according to the .env-template. (Optional) This can be generated inside the application.
 6. Open terminal in the installation directory.
 7. Run `pip install -r requirements.txt`
 8. Run `python3 ./project_assistant_v1.1.py`
