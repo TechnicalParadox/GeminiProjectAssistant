@@ -6,7 +6,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv, set_key
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from google.api_core.exceptions import DeadlineExceeded, InvalidArgument
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QLabel, QVBoxLayout, QLineEdit, QMessageBox, QFileDialog, QTextEdit, QFontDialog, QColorDialog, QInputDialog, QListWidget, QStatusBar, QHBoxLayout, QComboBox, QSpinBox, QDoubleSpinBox, QDialog
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QScrollArea, QLabel, QVBoxLayout, QLineEdit, QMessageBox, QFileDialog, QTextEdit, QFontDialog, QColorDialog, QInputDialog, QListWidget, QStatusBar, QHBoxLayout, QComboBox, QSpinBox, QDoubleSpinBox, QDialog
 from PyQt6.QtCore import Qt, QSize, QEvent
 from PyQt6.QtGui import QFont, QColor, QAction
 
@@ -127,7 +127,7 @@ def calculate_cost(tokens, pricing, messages):
         return million_tokens * pricing['over_128k'] # Calculate cost using the higher tier pricing
 
 
-class MainWindow(QMainWindow):
+class MainWindow(QMainWindow): # TODO: Catch exit and ask if they need to save
     def __init__(self):
         super().__init__()
 
@@ -220,6 +220,14 @@ class MainWindow(QMainWindow):
         # Initialize the model
         self.initialize_model()
     
+    def eventFilter(self, source, event):
+        """Filters events for the input box to handle Ctrl+Enter key press."""
+        if source is self.input_box and event.type() == QEvent.Type.KeyPress:
+            if event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_Return:
+                self.send_message()
+                return True
+        return super().eventFilter(source, event)
+
     def show_warnings_and_agreement(self):
         """Displays warnings and the user agreement, asking for acceptance."""
 
@@ -252,7 +260,7 @@ class MainWindow(QMainWindow):
 
     def send_message(self):
         """Sends the user's message to the Gemini model and handles the response."""
-        user_input = self.input_box.text()
+        user_input = self.input_box.toPlainText().strip()
         self.input_box.clear()
 
         self.send_message_to_model(user_input, self.timeout)
@@ -375,6 +383,7 @@ class MainWindow(QMainWindow):
             # Add messages to history for display and saving BEFORE sending the request
             self.messages.append({"role": "User", "content": message, "tokens": input_tokens}) # Store message in all_messages
             self.display_message("User", message)
+            # TODO: Force update of chat window so user message is displayed before model response comes back or maybe use send_message_async to accomplish this and avoid blocking the UI thread
 
             if DEBUG:
                 print("Sending message to model:", message, tag='Debug', tag_color='cyan', color='white')
@@ -416,22 +425,24 @@ class MainWindow(QMainWindow):
                 print(f"Error sending message: {e}", tag='Debug', tag_color='red')
             raise e
 
-    def display_message(self, sender, message):
-        """Displays a message in the chat window with appropriate formatting."""
+    def display_message(self, sender, message): # TODO: This doesn't auto scroll to bottom when new messages are added
+        """Appends the formatted message to the chat_history."""
         color = ""
         match sender:
             case "User":
-                color = "#00ff00" # Code green
+                color = "green" 
             case "Model":
-                color = "#00ffff" # Cyan
+                color = "cyan"
             case "Error":
-                color = "#ff0000" # Red
+                color = "red" 
             case "Warning":
-                color = "#ff9900" # Orange
+                color = "orange" 
             case _:
-                color = "#ff00ff" # Magenta
-                
-        self.chat_window.append(f"<strong style='color:{color};'>{sender}:</strong> {message}<br>")
+                color = "magenta" 
+
+        formatted_message = f"<p style='margin: 0px;'><strong style='color:{color};'>{sender}:</strong> {message}</p><hr style='width: 100%; border-top: 1px;'>"
+        self.chat_history.append(formatted_message) # Append to chat_history list
+        self.update_chat_window() # Update the chat window
 
     def load_chat_history(self):
         """Opens a dialog to load chat history from a file."""
@@ -590,19 +601,27 @@ class MainWindow(QMainWindow):
 
     def create_chat_window(self):
         """Creates the chat window area."""
-        self.chat_window = QTextEdit()
-        self.chat_window.setReadOnly(True)
+        self.chat_window = QTextEdit() 
+        self.chat_window.setReadOnly(True) # Ensure the user can't directly edit the chat history
+        self.chat_window.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth) # Ensure text wraps within the widget's width
         self.layout.addWidget(self.chat_window)
 
     def create_input_area(self):
         """Creates the input area for user messages."""
-        self.input_box = QLineEdit()
-        self.input_box.returnPressed.connect(self.send_message)
+        self.input_box = QTextEdit()
+        self.input_box.installEventFilter(self) # Install event filter for Ctrl+Enter handling
+        # TODO: adjust height of input box, should be small but expandable
         self.layout.addWidget(self.input_box)
+
+        # Create a horizontal layout for the input box and send button
+        input_layout = QHBoxLayout()
+        input_layout.addWidget(self.input_box)
 
         self.send_button = QPushButton("Send")
         self.send_button.clicked.connect(self.send_message)
-        self.layout.addWidget(self.send_button)
+        input_layout.addWidget(self.send_button)
+
+        self.layout.addLayout(input_layout)
 
     def create_status_bar(self):
         """Creates the status bar."""
@@ -682,9 +701,10 @@ class MainWindow(QMainWindow):
 
     def update_chat_window(self):
         """Updates the chat window with the current chat history."""
-        self.chat_window.clear() # Clear existing content before updating
-        for message in self.messages:
-            self.display_message(message['role'], message['content'])
+        full_html = ""  # Initialize an empty string for the full HTML content
+        for message in self.chat_history: 
+            full_html += message # Append each formatted message to the full_html
+        self.chat_window.setHtml(full_html)  # Set the HTML content of the QTextEdit
 
     def update_status_bar(self): # TODO: Make permanent widget instead of message so it doesn't clear when hovering over menu bar.
         """Updates the status bar with session information."""
