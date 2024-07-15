@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from google.api_core.exceptions import DeadlineExceeded
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QLabel, QVBoxLayout, QLineEdit, QMessageBox, QFileDialog, QTextEdit, QFontDialog, QColorDialog, QInputDialog, QListWidget, QStatusBar
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QEvent
 from PyQt6.QtGui import QFont, QColor, QAction
 
 DEBUG = True  # Set to True to enable debug messages
@@ -26,6 +26,7 @@ NO_SAFETY = {
     HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE
 }
+
 # Low safety settings
 LOW_SAFETY = {
     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
@@ -33,6 +34,7 @@ LOW_SAFETY = {
     HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_ONLY_HIGH
 }
+
 # Medium safety settings
 MEDIUM_SAFETY = {
     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
@@ -40,6 +42,7 @@ MEDIUM_SAFETY = {
     HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE
 }
+
 # High safety settings
 HIGH_SAFETY = {
     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
@@ -51,6 +54,7 @@ HIGH_SAFETY = {
 # Gemini Pricing per 1 million tokens (as of July 10, 2024)
 PRICING_DATE = '2024-07-13'
 PRICING_MODEL = 'gemini-1.5-pro-latest'
+
 INPUT_PRICING = {
     "upto_128k": 3.50, # Price per million tokens for prompts up to 128,000 tokens
     "over_128k": 7.00 # Price per million tokens for prompts over 128,000 tokens
@@ -60,6 +64,7 @@ OUTPUT_PRICING = {
     "over_128k": 21.00 # Price per million tokens for outputs over 128,000 tokens
 }
 
+# TODO: Format these and display on startup
 INSTRUCTIONS = '''
 - Converse with the LLM model to get help with your project. Ex. 'Help me debug this script.', 'Complete the TODOs in this file.', 'What can I add to improve this project?', etc.
 - Cost will be shown for each message and the total cost of the session will be displayed.
@@ -173,6 +178,9 @@ class MainWindow(QMainWindow):
 
         # Display settings after UI setup
         self.display_loaded_settings()
+
+        # Initialize the model
+        self.initialize_model()
 
     def send_message(self):
         """Sends the user's message to the Gemini model and handles the response."""
@@ -292,17 +300,6 @@ class MainWindow(QMainWindow):
             if ok and user_message:
                 self.send_message_to_model(context + "\nUser Input: " + user_message, self.timeout)
 
-    def display_chat_history(self, sender, message):
-        """Displays a message in the chat window with appropriate formatting."""
-        color = ""
-        match sender:
-            case "User":
-                color = "#00ff00" # Green
-            case "Model":
-                color = "cyan" # Cyan
-
-        self.chat_window.append(f"<strong style='color:{color};'>{sender}:</strong> {message}<br>")
-
     def display_chat_history(self):
         """Displays a concise chat history in a larger message box."""
         history_text = []
@@ -314,6 +311,9 @@ class MainWindow(QMainWindow):
             # Apply color based on message role 
             color = "#00ff00" if m['role'] == "User" else "cyan"
             history_text.append(f"{i+1}. <span style='color:{color};'>{m['role']}:</span> {content_preview}")
+
+        if DEBUG:
+            print('Model Chat History:', self.chat.history, tag='Debug', tag_color='cyan', color='white')
 
         message_box = QMessageBox(self)
         message_box.setWindowTitle("Chat History")
@@ -335,29 +335,26 @@ class MainWindow(QMainWindow):
     
     def send_message_to_model(self, message, timeout):
         """Sends the message to the Gemini model and handles the response."""
-        genai.configure(api_key=API_KEY)
-
-        # Initialize the model and chat session if not already done
-        if not self.model:
-            self.model = genai.GenerativeModel(
-                model_name=self.model_name,
-                generation_config=self.generation_config,
-                safety_settings=self.safety_settings,
-                system_instruction=self.system_instructions,
-            )
-            self.chat = self.model.start_chat()
-
         try:
+            # Calculate token counts for the user's message and subtract system instructions tokens
+            total_message_tokens = self.model.count_tokens([{'role': 'user', 'parts':[message]}]).total_tokens
+            input_tokens = total_message_tokens - self.system_instruction_tokens
+
             # Add messages to history for display and saving BEFORE sending the request
             self.chat_history.append(f"<span style='color:#00ff00;'><strong>You:</strong></span> {message}<br>")
-            self.all_messages.append({"role": "User", "content": message}) # Store message in all_messages
+            self.all_messages.append({"role": "User", "content": message, "tokens": input_tokens}) # Store message in all_messages
             self.update_chat_window()
 
             if DEBUG:
                 print("Sending message to model:", message, tag='Debug', tag_color='cyan', color='white')
 
-            # Send the message to the model 
-            response = self.chat.send_message(message, request_options={'timeout': timeout})
+            # Send the message to the model. Overrides settings in case they are changed during the session
+            response = self.chat.send_message(
+                message,
+                request_options={'timeout': timeout},
+                generation_config=self.generation_config,
+                safety_settings=self.safety_settings
+                )
 
             if DEBUG:
                 print("Full response from model:", response, tag='Debug', tag_color='cyan', color='white') 
@@ -365,12 +362,12 @@ class MainWindow(QMainWindow):
             # Update token counts
             self.last_input_tokens = response.usage_metadata.prompt_token_count
             self.last_output_tokens = response.usage_metadata.candidates_token_count
-            self.total_input_tokens += self.last_input_tokens 
+            self.total_input_tokens += input_tokens # Only add the input tokens without system instructions
             self.total_output_tokens += self.last_output_tokens
 
             # Add Model response to chat history
             self.chat_history.append(f"<span style='color:cyan;'><strong>Model:</strong></span> {response.text}<br>") 
-            self.all_messages.append({"role": "Model", "content": response.text})
+            self.all_messages.append({"role": "Model", "content": response.text, "tokens": self.last_output_tokens}) # Store message in all_messages
             self.update_chat_window()
 
             # Update session cost 
@@ -403,7 +400,7 @@ class MainWindow(QMainWindow):
                 
         self.chat_window.append(f"<strong style='color:{color};'>{sender}:</strong> {message}<br>")
 
-    def open_chat_history(self):
+    def load_chat_history(self):
         """Opens a dialog to load chat history from a file."""
         file_dialog = QFileDialog()
         file_dialog.setNameFilter("Chat History (*.json)")
@@ -412,12 +409,15 @@ class MainWindow(QMainWindow):
             try:
                 with open(filename, 'r') as f:
                     data = json.load(f)
-                    self.session_cost = data.get("total_session_cost", 0.00)
-                    self.chat_history = [
-                        f"<strong>{m['role']}:</strong> {m['content']}" for m in data.get("chat_history", [])
-                    ]
-                    # Clear all_messages and reconstruct from loaded data
-                    self.all_messages = data.get("chat_history", []) 
+
+                    # Load messages and add to chat.history and all_messages
+                    for message_data in data.get("chat_history", []):
+                        role = message_data['role']
+                        content = message_data['content']
+                        tokens = message_data.get('tokens', 0) # Get tokens, default to 0 if not present in older files
+                        self.all_messages.append({"role": role, "content": content, "tokens": tokens})
+                        self.chat_history.append(f"<span style='color:#00ff00;'><strong>You:</strong></span> {content}<br>" if role == "User" else f"<span style='color:cyan;'><strong>Model:</strong></span> {content}<br>")
+                        self.chat.history.append({'parts': [{'text': content}], 'role': role.lower()})
                     self.update_chat_window()
                     self.update_status_bar()
                     self.display_message("System", "Chat history loaded successfully.")
@@ -426,22 +426,57 @@ class MainWindow(QMainWindow):
 
     def save_chat_history(self):
         """Opens a dialog to save chat history to a file."""
-        file_dialog = QFileDialog()
-        file_dialog.setNameFilter("Chat History (*.json)")
-        file_dialog.setDefaultSuffix(".json")
+        file_dialog = QFileDialog(self)
+        file_dialog.setNameFilter("*.json *.txt *.md *.csv")  # Allow multiple file types
+        file_dialog.setDefaultSuffix(".json")  # Set default to JSON
+        file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+
         if file_dialog.exec():
             filename = file_dialog.selectedFiles()[0]
+
+            # Get the chosen file format based on the file extension
+            file_extension = os.path.splitext(filename)[1].lower()
+
             try:
-                with open(filename, 'w') as f:
-                    # Prepare data for saving, only store content
-                    data = {
-                        "total_session_cost": self.session_cost,
-                        "chat_history": [
-                            {"role": m.split(":")[0].strip()[3:-4], "content": m.split(":")[1].strip()[1:]} for m in self.chat_history
-                        ]
-                    }
-                    json.dump(data, f, indent=4)
-                    self.display_message("System", f"Chat history saved to {filename}")
+                with open(filename, "w") as f:
+                    match file_extension:
+                        case ".json":
+                            data = {
+                                "total_session_cost": self.session_cost,
+                                "system_instruction": {
+                                    "content": self.system_instructions,
+                                    "tokens": self.system_instruction_tokens,
+                                    "cost": calculate_cost(self.system_instruction_tokens, INPUT_PRICING) # Calculate the cost of the system instructions
+                                },
+                                "chat_history": self.all_messages
+                            }
+                            json.dump(data, f, indent=4)
+                        case ".txt":
+                            f.write(f"Total session cost: ${self.session_cost:.5f}\n\n")
+                            f.write(f"0. System Instructions, {self.system_instruction_tokens} tokens - {self.system_instructions}\n") # System instructions at index 0
+                            for i, m in enumerate(self.all_messages):
+                                f.write(f"{i+1}. {m['role']}, {m['tokens']} tokens - {m['content']}\n")
+                        case ".md":
+                            f.write(f"# Total session cost: ${self.session_cost:.5f}\n\n")
+                            f.write("---\n")
+                            f.write(f"### 0. System Instructions, {self.system_instruction_tokens} tokens\n")
+                            f.write(f"{self.system_instructions}\n\n")
+                            f.write("---\n")
+                            f.write("# Chat History\n")
+                            for i, m in enumerate(self.all_messages):
+                                f.write(f"### {i+1}. {m['role']}, {m['tokens']} tokens\n")
+                                f.write(f"{m['content']}\n\n")
+                                f.write("---\n")
+                        case ".csv":
+                            f.write(f'Session Cost:,{self.session_cost:.5f}\n')
+                            f.write("Role,Tokens,Content\n")
+                            f.write(f"System Instructions,{self.system_instruction_tokens},\"{self.system_instructions}\"\n") # System instructions on the first line
+                            for m in self.all_messages:
+                                f.write(f"{m['role']},{m['tokens']},\"{m['content']}\"\n") 
+                        case _:
+                            raise ValueError("Invalid file format")
+
+                self.display_message("System", f"Chat history saved to {filename}")
             except Exception as e:
                 self.display_message("Error", f"Error saving chat history: {e}")
 
@@ -452,8 +487,8 @@ class MainWindow(QMainWindow):
         # File Menu
         file_menu = menu_bar.addMenu("File")
 
-        open_action = QAction("Open Chat History", self)
-        open_action.triggered.connect(self.open_chat_history)
+        open_action = QAction("Load History Into Current Session", self)
+        open_action.triggered.connect(self.load_chat_history)
         file_menu.addAction(open_action)
 
         save_action = QAction("Save Chat History", self)
@@ -511,14 +546,15 @@ class MainWindow(QMainWindow):
         api_key, ok = QInputDialog.getText(self, "API Key", "Enter your Google Gemini API Key:")
         if ok and api_key:
             API_KEY = api_key
-            self.display_message("API Key", "API Key set successfully. You may need to restart the application.") # TODO: Save api key in .env
+            self.display_message("API Key", "API Key set successfully. Restart the application.")
+            # TODO: Save api key in .env
         else:
             self.display_message("API Key", "API Key not set. Attempting to revert to .env setting.")
             API_KEY = os.getenv('API_KEY')
     
     def configure_settings(self):
         """Allows the user to configure application settings."""
-        pass  
+        pass  # TODO: Implement this
 
     def load_system_instructions(self):
         """Loads and displays the system instructions."""
@@ -538,13 +574,13 @@ class MainWindow(QMainWindow):
         """Updates the status bar with session information."""
         last_message_input_cost = calculate_cost(self.last_input_tokens, INPUT_PRICING)
         last_message_output_cost = calculate_cost(self.last_output_tokens, OUTPUT_PRICING)
-        message = (
+        message = ( # TODO: Use a permanent widget for this, color code
             f"Session Cost: ${self.session_cost:.5f} | "
             f"Last Message: Input: {self.last_input_tokens} tokens, ${last_message_input_cost:.5f}, "
             f"Output: {self.last_output_tokens} tokens, ${last_message_output_cost:.5f}"
         )
         self.status_bar.showMessage(message)
-    
+
     def load_config(self):
         """Loads configuration settings from a JSON file."""
         script_dir = os.path.dirname(__file__)
@@ -587,6 +623,22 @@ class MainWindow(QMainWindow):
             self.display_message("Error", f"Error parsing configuration file: {config_file}")
         except Exception as e:
             self.display_message("Error", f"An error occurred loading configuration: {e}")
+
+    def initialize_model(self):
+        """Initializes the Gemini model with the loaded settings."""
+        genai.configure(api_key=API_KEY)
+
+        self.model = genai.GenerativeModel(
+                model_name=self.model_name,
+                generation_config=self.generation_config,
+                safety_settings=self.safety_settings,
+                system_instruction=self.system_instructions,
+            )
+        
+        self.chat = self.model.start_chat()
+        # Calculate and store system instruction tokens when the model is initialized
+        self.system_instruction_tokens = self.model.count_tokens(" ").total_tokens 
+
 
     def display_loaded_settings(self):
         """Displays the loaded settings in the chat window."""
