@@ -85,7 +85,9 @@ WARNINGS = '''
 - AI generated code may be harmful or malicious. Review and validate generated code carefully.
 - The author of this script is not responsible for any consequences of using this application.'''
 
-def calculate_cost(tokens, pricing):
+SI_TOKENS = 0
+
+def calculate_cost(tokens, pricing, messages):
     """Calculates the cost based on token usage.
 
     Args:
@@ -96,7 +98,14 @@ def calculate_cost(tokens, pricing):
         float: The calculated cost.
     """
     million_tokens = tokens / 1_000_000 # Convert tokens to millions of tokens
-    if tokens <= 128_000: # Check if token usage falls within the lower pricing tier
+
+    # Calculate based on total input tokens
+    total_tokens = 0
+    total_tokens += SI_TOKENS
+    for m in messages:
+        total_tokens += m['tokens']
+    
+    if total_tokens <= 128_000: # Check if token usage falls within the lower pricing tier
         return million_tokens * pricing['upto_128k'] # Calculate cost using the lower tier pricing
     else: 
         return million_tokens * pricing['over_128k'] # Calculate cost using the higher tier pricing
@@ -155,7 +164,6 @@ class MainWindow(QMainWindow):
         # Load system instructions
         self.display_message("Welcome", "Welcome to Gemini Project Assistant!")
 
-
         # Load Configuration and API Key
         self.load_config()  
         self.load_api_key()
@@ -165,6 +173,12 @@ class MainWindow(QMainWindow):
             "stop_sequences": self.stop_sequences
         }
 
+        # Display current pricing information
+        self.display_message("Pricing", f"Pricing as of {PRICING_DATE} for {PRICING_MODEL}:")
+        self.display_message("Input", f"${INPUT_PRICING['upto_128k']} per million tokens (up to 128k tokens), ${INPUT_PRICING['over_128k']} per million tokens (over 128k tokens).")
+        self.display_message("Output", f"${OUTPUT_PRICING['upto_128k']} per million tokens (up to 128k tokens), ${OUTPUT_PRICING['over_128k']} per million tokens (over 128k tokens).")
+
+
         # Display settings after UI setup
         self.display_loaded_settings()
 
@@ -173,8 +187,6 @@ class MainWindow(QMainWindow):
 
         # Initialize the model
         self.initialize_model()
-
-        # TODO: Display prcing information in the chat window
     
     def show_warnings_and_agreement(self):
         """Displays warnings and the user agreement, asking for acceptance."""
@@ -218,7 +230,7 @@ class MainWindow(QMainWindow):
         message_indices_str, ok = QInputDialog.getText(
             self,
             "Delete Messages",
-            "You may want to save first.<br>Message indicies are shown with the Display Chat History command.<br>Enter the indices of messages to delete (comma-separated):",
+            "You may want to save first.<br>Message indicies are shown with the Display Chat History tool.<br>Enter the indices of messages to delete (comma-separated):",
         )
         if DEBUG:
             print("DEBUG: User entered message indices:", message_indices_str, tag="DEBUG", tag_color="cyan", color="white")
@@ -292,7 +304,7 @@ class MainWindow(QMainWindow):
             # Calculate message content preview, removing newlines
             content_preview = m['content'][:75] + ' ... ' + m['content'][-75:] if len(m['content']) > 150 else m['content']
             content_preview = content_preview.replace('\n', ' ')
-            input_cost = calculate_cost(m['tokens'], INPUT_PRICING) # Calculate cost to keep message
+            input_cost = calculate_cost(m['tokens'], INPUT_PRICING, self.messages) # Calculate cost to keep message
             total_cost += input_cost
             
             # Apply color based on message role 
@@ -312,7 +324,7 @@ class MainWindow(QMainWindow):
     def view_full_message(self):
         """Allows the user to view the full content of a message."""
         message_index, ok = QInputDialog.getInt(
-            self, "View Message", "Enter message index:", 1, 1, len(self.messages), 1 # Use self.messages since this is what the index refers to
+            self, "View Message", "You can view message indicies with the Display Chat History tool.<br>Enter message index:", 1, 1, len(self.messages), 1 # Use self.messages since this is what the index refers to
         )
         if ok:
             try:
@@ -357,7 +369,7 @@ class MainWindow(QMainWindow):
             self.display_message("Model", response.text)
 
             # Update session cost 
-            self.session_cost = calculate_cost(self.total_input_tokens, INPUT_PRICING) + calculate_cost(self.total_output_tokens, OUTPUT_PRICING)
+            self.session_cost = calculate_cost(self.total_input_tokens, INPUT_PRICING, self.messages) + calculate_cost(self.total_output_tokens, OUTPUT_PRICING, self.messages)
 
             self.update_status_bar()
 
@@ -446,7 +458,7 @@ class MainWindow(QMainWindow):
                                 "system_instruction": {
                                     "content": self.system_instructions,
                                     "tokens": self.system_instruction_tokens,
-                                    "cost": calculate_cost(self.system_instruction_tokens, INPUT_PRICING) # Calculate the cost of the system instructions
+                                    "cost": calculate_cost(self.system_instruction_tokens, INPUT_PRICING, self.messages) # Calculate the cost of the system instructions
                                 },
                                 "chat_history": self.messages
                             }
@@ -638,15 +650,6 @@ class MainWindow(QMainWindow):
             self.chat = self.model.start_chat()
             self.display_message('System', 'Settings updated.') # Inform the user that the settings have been updated
 
-    def load_system_instructions(self):
-        """Loads and displays the system instructions."""
-        if self.model and not self.system_message_displayed:
-            si_tokens = self.model.count_tokens(" ").total_tokens
-            self.display_message("System Instructions", self.system_instructions)
-            self.display_message("Tokens", si_tokens)
-            self.display_message("Cost", f"${calculate_cost(si_tokens, INPUT_PRICING):.5f}")
-            self.system_message_displayed = True 
-
     def update_chat_window(self):
         """Updates the chat window with the current chat history."""
         self.chat_window.clear() # Clear existing content before updating
@@ -655,8 +658,8 @@ class MainWindow(QMainWindow):
 
     def update_status_bar(self):
         """Updates the status bar with session information."""
-        last_message_input_cost = calculate_cost(self.last_input_tokens, INPUT_PRICING)
-        last_message_output_cost = calculate_cost(self.last_output_tokens, OUTPUT_PRICING)
+        last_message_input_cost = calculate_cost(self.last_input_tokens, INPUT_PRICING, self.messages)
+        last_message_output_cost = calculate_cost(self.last_output_tokens, OUTPUT_PRICING, self.messages)
         message = ( 
             f"Session Cost: ${self.session_cost:.5f} | "
             f"Last Message: Input: {self.last_input_tokens} tokens, ${last_message_input_cost:.5f}, "
@@ -722,8 +725,13 @@ class MainWindow(QMainWindow):
             )
 
             self.chat = self.model.start_chat()
-            self.system_instruction_tokens = self.model.count_tokens(" ").total_tokens
-            self.load_system_instructions() # Update system instructions if needed
+
+            global SI_TOKENS
+            SI_TOKENS = self.model.count_tokens(" ").total_tokens
+            self.system_instruction_tokens = SI_TOKENS
+            self.display_message("System Instructions", self.system_instructions)
+            self.display_message("Tokens", SI_TOKENS)
+            self.display_message("Cost", f"${calculate_cost(SI_TOKENS, INPUT_PRICING, self.messages):.5f}")
             self.system_message_displayed = True # Resetting this here
 
         except InvalidArgument as e:
@@ -759,17 +767,6 @@ class MainWindow(QMainWindow):
             print("Temperature:", self.temperature, tag="DEBUG", tag_color="cyan", color="white")
             print("Max Output Tokens:", self.max_output_tokens, tag="DEBUG", tag_color="cyan", color="white")
             print("Stop Sequences:", self.stop_sequences, tag="DEBUG", tag_color="cyan", color="white")
-
-        #No need to display these in the chat window
-        #self.display_message("Using Model", self.model_name)
-        #self.display_message("System Instructions", self.system_instructions)
-        #self.display_message("Safety Level", self.safety_level)
-        #self.display_message("Timeout", self.timeout)
-        #self.display_message("Project Directory", self.project_dir)
-        #self.display_message("Ignored Extensions", self.ignored_extensions)
-        #self.display_message("Temperature", self.temperature)
-        #self.display_message("Max Output Tokens", self.max_output_tokens)
-        #self.display_message("Stop Sequences", self.stop_sequences)
 
     def clear_chat_history(self):
         """Clears the chat history for the current session."""
