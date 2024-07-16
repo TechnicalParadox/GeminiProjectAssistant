@@ -292,6 +292,12 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.StandardButton.No:
             sys.exit()   # Exit program if user does not agree to terms and conditions
 
+    def set_timeout(self):
+        """Opens a dialog to adjust the timeout setting."""
+        timeout, ok = QInputDialog.getInt(self, "Timeout", "Enter new timeout (seconds):", self.timeout, step=10)
+        if ok: self.timeout = timeout
+        self.display_message("Timeout", f'Timeout set to {self.timeout} seconds.')
+
     def send_message(self, files = False):
         """Sends the user's message to the Gemini model and handles the response."""
         if self.request_in_progress:
@@ -324,7 +330,7 @@ class MainWindow(QMainWindow):
         # Start the progress bar
         self.progress_bar.setValue(0)
         self.progress_bar.setMaximum(self.timeout * 4)  # Set the maximum value of the progress bar
-        self.progress_bar.setFormat("Sending...")  # Set the progress bar text
+        self.progress_bar.setFormat("Awaiting Response...")  # Set the progress bar text
         self.timer = QTimer(self) # Create a QTimer instance
         self.timer.timeout.connect(self.update_progress_bar) # Connect the timeout signal to the update_progress_bar method
         self.timer.start(250) # Start the timer with a .25 second interval
@@ -421,43 +427,6 @@ class MainWindow(QMainWindow):
                 self.files_context = files_context
                 self.files_message = user_message
                 self.send_message(True)  # Send the user message to the model
-
-    def display_chat_history(self):
-        """Displays a concise chat history in a larger message box."""
-        history_text = []
-        total_cost = 0.0
-        for i, m in enumerate(self.messages):
-            # Calculate message content preview, removing newlines
-            content_preview = m['content'][:75] + ' ... ' + m['content'][-75:] if len(m['content']) > 150 else m['content']
-            content_preview = content_preview.replace('\n', ' ')
-            input_cost = calculate_cost(m['tokens'], INPUT_PRICING, self.messages) # Calculate cost to keep message
-            total_cost += input_cost
-            
-            # Apply color based on message role 
-            color = "#00ff00" if m['role'] == "User" else "cyan"
-            history_text.append(f"{i+1}. <span style='color:{color};'>{m['role']}:</span> Tokens: {m['tokens']}, Cost to keep: ${input_cost:.5f} | {content_preview}")
-        history_text.append(f"<strong>Total cost to keep: ${total_cost:.5f}</strong>")
-
-        if DEBUG:
-            print('Model Chat History:', self.chat.history, tag='Debug', tag_color='cyan', color='white')
-
-        message_box = QMessageBox(self)
-        message_box.setWindowTitle("Chat History")
-        message_box.setText("<br>".join(history_text))  # Join with <br> for line breaks
-        message_box.setStyleSheet("QLabel{min-width: 800px;}")
-        message_box.exec()
-
-    def view_full_message(self):
-        """Allows the user to view the full content of a message."""
-        message_index, ok = QInputDialog.getInt(
-            self, "View Message", "You can view message indicies with the Display Chat History tool.<br>Enter message index:", 1, 1, len(self.messages), 1 # Use self.messages since this is what the index refers to
-        )
-        if ok:
-            try:
-                message = self.messages[message_index - 1] # Adjust for zero-based indexing
-                QMessageBox.information(self, "Message Content", message['content']) # Only display the content
-            except IndexError:
-                self.display_message("Error", "Invalid message index.")
     
     async def send_message_async(self, message, timeout):
         """Sends the message asynchronously to the Gemini model and handles the response."""
@@ -561,6 +530,47 @@ class MainWindow(QMainWindow):
         formatted_message = f"<hr style='width: 100%; border-top: 1px;'><p style='margin: 0px;'><strong style='color:{color};'>{sender}:</strong> <span style='white-space: pre-wrap;'>{message}</span></p>"
         self.chat_history.append(formatted_message) # Append to chat_history list
         self.update_chat_window() # Update the chat window
+
+    def view_full_message(self):
+        """Allows the user to view the full content of a message."""
+        message_index, ok = QInputDialog.getInt(
+            self, "View Message", "You can view message indicies with the Display Chat History tool.<br>Enter message index:", 1, 1, len(self.messages), 1 # Use self.messages since this is what the index refers to
+        )
+        if ok:
+            try:
+                message = self.messages[message_index - 1] # Adjust for zero-based indexing
+                prefix = ''
+                print(message)
+                if message['role'] == 'User':
+                    prefix = f'<strong style="color:green;">User:</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
+                else:
+                    prefix = f'<strong style="color:cyan;">Model:</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
+                message_dialog = MessageDialog("Message Content", (prefix + message['content']))
+                message_dialog.exec()
+            except IndexError:
+                self.display_message("Error", "Invalid message index.")
+
+    def display_chat_history(self):
+        """Displays a concise chat history in a larger message box."""
+        history_text = []
+        total_cost = 0.0
+        for i, m in enumerate(self.messages):
+            # Calculate message content preview, removing newlines
+            content_preview = m['content'][:75] + ' ... ' + m['content'][-75:] if len(m['content']) > 150 else m['content']
+            content_preview = content_preview.replace('\n', ' ')
+            input_cost = calculate_cost(m['tokens'], INPUT_PRICING, self.messages) # Calculate cost to keep message
+            total_cost += input_cost
+            
+            # Apply color based on message role 
+            color = "green" if m['role'] == "User" else "cyan"
+            history_text.append(f"{i+1}. <span style='color:{color};'>{m['role']}:</span> Tokens: {m['tokens']}, Cost to keep: ${input_cost:.5f} | {content_preview}")
+        history_text.append(f"<hr><strong>Total cost to keep: ${total_cost:.5f}</strong>")
+
+        if DEBUG:
+            print('Model Chat History:', self.chat.history, tag='Debug', tag_color='cyan', color='white')
+
+        history_dialog = MessageDialog("Chat History", "<br>".join(history_text))
+        history_dialog.exec()
 
     def load_chat_history(self):
         """Opens a dialog to load chat history from a file."""
@@ -720,12 +730,6 @@ class MainWindow(QMainWindow):
         instructions_action = QAction("Show Instructions", self)
         instructions_action.triggered.connect(lambda: self.display_message("Instructions", INSTRUCTIONS))
         help_menu.addAction(instructions_action)
-
-    def set_timeout(self):
-        """Opens a dialog to adjust the timeout setting."""
-        timeout, ok = QInputDialog.getInt(self, "Timeout", "Enter new timeout (seconds):", self.timeout, step=10)
-        if ok: self.timeout = timeout
-        self.display_message("Timeout", f'Timeout set to {self.timeout} seconds.')
 
     def create_chat_window(self):
         """Creates the chat window area."""
@@ -999,6 +1003,32 @@ class MainWindow(QMainWindow):
             self.update_chat_window()  # Update the chat window
             self.update_status_bar()  # Update the status bar
 
+class MessageDialog(QDialog):
+    def __init__(self, title, text, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+
+        layout = QVBoxLayout(self)
+
+        # Create a QTextEdit to display the message
+        self.message_text = QTextEdit(self)
+        self.message_text.setReadOnly(True)
+        self.message_text.setText(text)
+        
+        # Wrap the QTextEdit in a QScrollArea
+        scroll_area = QScrollArea(self)
+        scroll_area.setWidget(self.message_text)
+        scroll_area.setWidgetResizable(True)  # Allow resizing the QTextEdit content
+
+        # Add the scroll area to the layout
+        layout.addWidget(scroll_area)
+
+        # Create a close button
+        close_button = QPushButton("Close", self)
+        close_button.clicked.connect(self.close)
+        layout.addWidget(close_button)
+
+        self.setMinimumSize(800, 400)  # Ensure a minimum size 
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
