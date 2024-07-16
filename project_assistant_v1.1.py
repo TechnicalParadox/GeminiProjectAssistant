@@ -70,7 +70,7 @@ G1_5_PRO_OUTPUT_PRICING = {
 
 # Gemini 1.5 Flash Latest Pricing per 1 million tokens (as of July 15, 2024)
 G1_5_FLASH_PRICING_DATE = '2024-07-15'
-G1_5_FLASH_PRICING_MODEL = 'gemini-1.5-flash'
+G1_5_FLASH_PRICING_MODEL = 'gemini-1.5-flash-latest'
 G1_5_FLASH_INPUT_PRICING = {
     "upto_128k": 0.35, # Price per million tokens for prompts up to 128,000 tokens
     "over_128k": 0.70 # Price per million tokens for prompts over 128,000 tokens
@@ -128,7 +128,6 @@ def calculate_cost(tokens, pricing, messages):
         return million_tokens * pricing['upto_128k'] # Calculate cost using the lower tier pricing
     else: 
         return million_tokens * pricing['over_128k'] # Calculate cost using the higher tier pricing
-
 
 class MainWindow(QMainWindow):
     response_receieved = pyqtSignal(object, int) # Signal to indicate response received
@@ -967,7 +966,7 @@ class SettingsDialog(QDialog):
         # Model Selection
         self.model_label = QLabel("Model:")
         self.model_combo = QComboBox(self)
-        self.model_combo.addItems(["gemini-1.5-pro-latest", "gemini-1.5-flash"]) # Add more models as needed
+        self.model_combo.addItems(["gemini-1.5-pro-latest", "gemini-1.5-flash-latest"]) # Add more models as needed
         layout.addWidget(self.model_label)
         layout.addWidget(self.model_combo)
 
