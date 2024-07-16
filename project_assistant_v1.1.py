@@ -730,8 +730,12 @@ class MainWindow(QMainWindow):
         """Creates the input area for user messages."""
         self.input_box = QTextEdit()
         self.input_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum )
-        self.input_box.setMinimumHeight(self.input_box.fontMetrics().lineSpacing() + 6)
-        self.input_box.setMaximumHeight(self.input_box.fontMetrics().lineSpacing() * 8 ) # Ensure it can handle multiple lines of text
+        self.input_box.setAcceptRichText(False)
+
+        # Dynamic resizing
+        self.input_box.textChanged.connect(self.adjust_input_box_height)
+        self.adjust_input_box_height()  # Adjust initial size to fit text
+
         self.input_box.installEventFilter(self) # Install event filter for Ctrl+Enter handling
         # TODO: adjust height of input box, should be small but expandable
         self.layout.addWidget(self.input_box)
@@ -745,6 +749,20 @@ class MainWindow(QMainWindow):
         input_layout.addWidget(self.send_button)
 
         self.layout.addLayout(input_layout)
+    
+    def adjust_input_box_height(self):
+        """Adjusts the height of the input box to fit text."""
+        max_lines = 8  # Maximum number of lines to show in input box
+
+        # Use QTextEdit's internal sizeHint to get the ideal height
+        doc_height = self.input_box.document().size().height()
+        line_height = self.input_box.fontMetrics().lineSpacing()
+        num_lines = doc_height // line_height 
+        desired_height = line_height * min(num_lines, max_lines) 
+
+        desired_height += 10 # Add some extra space for padding
+
+        self.input_box.setFixedHeight(int(desired_height))
 
     def create_status_bar(self):
         """Creates the status bar."""
