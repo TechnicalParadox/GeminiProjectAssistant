@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import asyncio
 from print_color import print
 import google.generativeai as genai
 from dotenv import load_dotenv, set_key
@@ -9,7 +10,7 @@ from google.api_core.exceptions import DeadlineExceeded, InvalidArgument
 from PyQt6.QtWidgets import ( QApplication, QMainWindow, QProgressBar, QWidget, QPushButton, QScrollArea, QLabel, QVBoxLayout, QLineEdit, QMessageBox, QFileDialog, QTextEdit,
                               QFontDialog, QColorDialog, QInputDialog, QListWidget, QStatusBar, QHBoxLayout, QComboBox, QSpinBox, QDoubleSpinBox, QDialog
                             )
-from PyQt6.QtCore import Qt, QSize, QEvent, QTimer
+from PyQt6.QtCore import Qt, QSize, QEvent, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import QFont, QColor, QAction
 
 DEBUG = True  # Set to True to enable debug messages
@@ -130,8 +131,17 @@ def calculate_cost(tokens, pricing, messages):
 
 
 class MainWindow(QMainWindow):
+    response_receieved = pyqtSignal(object, int) # Signal to indicate response received
+
     def __init__(self):
         super().__init__()
+
+        self.loop = asyncio.new_event_loop() # Create the event loop
+        asyncio.set_event_loop(self.loop)
+
+        self.request_in_progress = False # Flag to track ongoing requests
+
+        self.response_receieved.connect(self.update_ui_with_response) # Connect signal to slot
 
         self.setWindowTitle("Gemini Project Assistant")
         self.setGeometry(100, 100, 1200, 800)
@@ -247,6 +257,9 @@ class MainWindow(QMainWindow):
             event.accept()
         else:
             event.ignore()  # Prevent the window from closing if the user chooses Cancel
+        
+        # Close the event loop
+        self.loop.close()
 
     def show_warnings_and_agreement(self):
         """Displays warnings and the user agreement, asking for acceptance."""
@@ -280,10 +293,32 @@ class MainWindow(QMainWindow):
 
     def send_message(self):
         """Sends the user's message to the Gemini model and handles the response."""
+        if self.request_in_progress:
+            QMessageBox.warning(self, "Request in Progress", "A request is already in progress. Please wait for the current request to complete.")
+            return
+        
+        self.request_in_progress = True
+
         user_input = self.input_box.toPlainText().strip()
         self.input_box.clear()
 
-        self.send_message_to_model(user_input, self.timeout)
+        # Add messages to history for display and saving BEFORE sending the request
+        total_message_tokens = self.model.count_tokens([{'role': 'user', 'parts':[user_input]}]).total_tokens
+        input_tokens = total_message_tokens - self.system_instruction_tokens
+        self.messages.append({"role": "User", "content": user_input, "tokens": input_tokens})  # Store message in messages
+        self.display_message("User", user_input)  # Display the user message in the chat history
+
+        # Start the progress bar
+        self.progress_bar.setValue(0)
+        self.progress_bar.setMaximum(self.timeout * 4)  # Set the maximum value of the progress bar
+        self.progress_bar.setFormat("Sending...")  # Set the progress bar text
+        self.timer = QTimer(self) # Create a QTimer instance
+        self.timer.timeout.connect(self.update_progress_bar) # Connect the timeout signal to the update_progress_bar method
+        self.timer.start(250) # Start the timer with a .25 second interval
+
+        thread = QThread(self)
+        thread.run = lambda: self.send_message_thread(user_input, self.timeout)
+        thread.start()
 
     def delete_messages(self):
         """Deletes messages from history and updates the model's context."""
@@ -334,12 +369,14 @@ class MainWindow(QMainWindow):
 
         file_dialog = QFileDialog()
         file_dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
+
+        # Set the project directory if available, otherwise default to user's home directory if available
         if self.project_dir:
             file_dialog.setDirectory(self.project_dir)
         else:
             if os.path.exists(os.path.expanduser("~")):
                 file_dialog.setDirectory(os.path.expanduser("~"))
-            else:
+            else: # Home directory not found, display error
                 self.display_message("Error", "Set the project directory to add files to the context.")
 
         if file_dialog.exec(): # TODO: Force file dialog to open in front of chat window
@@ -405,29 +442,18 @@ class MainWindow(QMainWindow):
             except IndexError:
                 self.display_message("Error", "Invalid message index.")
     
-    def send_message_to_model(self, message, timeout): # TODO: Handle other exceptions appropriately, Safety exception for example
-        """Sends the message to the Gemini model and handles the response."""
+    async def send_message_async(self, message, timeout):
+        """Sends the message asynchronously to the Gemini model and handles the response."""
         try:
-            # Start the progress bar animation # TODO: We need to implement send_message_async to avoid blocking the UI thread
-            self.progress_bar.setMaximum(timeout) # Set the maximum value of the progress bar
-            self.timer = QTimer(self) # Create a QTimer instance
-            self.timer.timeout.connect(self.update_progress_bar) # Connect the timeout signal to the update_progress_bar method
-            self.timer.start(1000) # Start the timer with a 1 second interval
-
             # Calculate token counts for the user's message and subtract system instructions tokens
             total_message_tokens = self.model.count_tokens([{'role': 'user', 'parts':[message]}]).total_tokens
             input_tokens = total_message_tokens - self.system_instruction_tokens
 
-            # Add messages to history for display and saving BEFORE sending the request
-            self.messages.append({"role": "User", "content": message, "tokens": input_tokens}) # Store message in all_messages
-            self.display_message("User", message)
-            # TODO: Force update of chat window so user message is displayed before model response comes back or maybe use send_message_async to accomplish this and avoid blocking the UI thread
-
             if DEBUG:
                 print("Sending message to model:", message, tag='Debug', tag_color='cyan', color='white')
 
-            # Send the message to the model. Overrides settings in case they are changed during the session
-            response = self.chat.send_message(
+            # Send the message asynchronously to the model. Overrides settings in case they are changed during the session
+            response = await self.chat.send_message_async(
                 message,
                 request_options={'timeout': timeout},
                 generation_config=self.generation_config,
@@ -437,36 +463,59 @@ class MainWindow(QMainWindow):
             if DEBUG:
                 print("Full response from model:", response, tag='Debug', tag_color='cyan', color='white') 
 
-            # Update token counts
-            self.last_input_tokens = response.usage_metadata.prompt_token_count
-            self.last_output_tokens = response.usage_metadata.candidates_token_count
-            self.total_input_tokens += input_tokens # Only add the input tokens without system instructions
-            self.total_output_tokens += self.last_output_tokens
+            return response, input_tokens
 
-            # Add Model response to chat history
-            self.messages.append({"role": "Model", "content": response.text, "tokens": self.last_output_tokens}) # Store message in all_messages
-            self.display_message("Model", response.text)
-
-            # Update session cost 
-            self.session_cost = calculate_cost(self.total_input_tokens, INPUT_PRICING, self.messages) + calculate_cost(self.total_output_tokens, OUTPUT_PRICING, self.messages)
-
-            self.update_status_bar()
-
-            self.progress_bar.setValue(self.progress_bar.maximum()) # Indicate successful completion
-
-            return self.last_input_tokens, self.last_output_tokens, response.text
+        # Handle exceptions
         except DeadlineExceeded:
             QMessageBox.warning(self, "Timeout", "The request to the Gemini API timed out. Try increasing the timeout setting or reducing the complexity of your request. You are not charged when this happens. Please note that this message was still added to history, so delete it if you wish.")
             self.chat.history.append({'parts': [{'text': message}], 'role': 'user'})
             if DEBUG:
                 print(f"DeadlineExceeded: Request timed out after {timeout} seconds.", tag='Debug', tag_color='red') # Log the timeout
-            self.progress_bar.setValue(self.progress_bar.maximum()) # Indicate Timeout
+            self.request_in_progress = False # Allow new requests
+            return None, input_tokens
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred: {e}")
             if DEBUG:
                 print(f"Error sending message: {e}", tag='Debug', tag_color='red')
-            self.progress_bar.setValue(self.progress_bar.maximum()) # Reset the progress bar
-            raise e
+            self.request_in_progress = False # Allow new requests
+            return None, input_tokens
+    
+    def send_message_thread(self, message, timeout):
+        """Runs the asynchronous send_message_async in a separate thread."""
+        async def run_task():
+            response, input_tokens = await self.send_message_async(message, timeout)
+            if response:
+                self.handle_response(response, input_tokens)
+            else:
+                self.progress_bar.setValue(self.progress_bar.maximum()) # Indicate completion (timeout or error)
+        
+        try:
+            self.loop.run_until_complete(run_task())
+        finally:
+            pass
+    
+    def handle_response(self, response, input_tokens):
+        """Handles the response from the model."""
+        self.request_in_progress = False # Allow new requests
+        self.response_receieved.emit(response, input_tokens) # Emit signal with response and input tokens
+    
+    def update_ui_with_response(self, response, input_tokens):
+        """Updates the UI with the response from the model."""
+        self.last_input_tokens = response.usage_metadata.prompt_token_count
+        self.last_output_tokens = response.usage_metadata.candidates_token_count
+        self.total_input_tokens += input_tokens  # Only add the input tokens without system instructions
+        self.total_output_tokens += self.last_output_tokens
+
+        # Add Model response to chat history
+        self.messages.append({"role": "Model", "content": response.text, "tokens": self.last_output_tokens})  # Store message in all_messages
+        self.display_message("Model", response.text)
+
+        # Update session cost
+        self.session_cost = calculate_cost(self.total_input_tokens, INPUT_PRICING, self.messages) + calculate_cost(self.total_output_tokens, OUTPUT_PRICING, self.messages)
+
+        self.update_status_bar()
+
+        self.progress_bar.setValue(self.progress_bar.maximum())  # Indicate successful completion
 
     def display_message(self, sender, message): # TODO: This doesn't auto scroll to bottom when new messages are added
         """Appends the formatted message to the chat_history."""
@@ -683,6 +732,7 @@ class MainWindow(QMainWindow):
 
         # Create a progress bar
         self.progress_bar = QProgressBar(self)
+        self.progress_bar.setFixedWidth(200) # Set a fixed width for the progress bar
         self.progress_bar.setMaximum(self.timeout) # Set the maximum value of the progress bar
         self.progress_bar.setTextVisible(False) # Hide the text on the progress bar
         self.status_bar.addPermanentWidget(self.progress_bar) # Add the progress bar to the status bar
