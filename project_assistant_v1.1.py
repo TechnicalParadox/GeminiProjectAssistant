@@ -207,7 +207,7 @@ class MainWindow(QMainWindow):
                 PRICING_MODEL = G1_5_PRO_PRICING_MODEL
                 INPUT_PRICING = G1_5_PRO_INPUT_PRICING
                 OUTPUT_PRICING = G1_5_PRO_OUTPUT_PRICING
-            case 'gemini-1.5-flash':
+            case 'gemini-1.5-flash-latest':
                 PRICING_DATE = G1_5_FLASH_PRICING_DATE
                 PRICING_MODEL = G1_5_FLASH_PRICING_MODEL
                 INPUT_PRICING = G1_5_FLASH_INPUT_PRICING
@@ -467,7 +467,7 @@ class MainWindow(QMainWindow):
 
             return response, input_tokens
 
-        # Handle exceptions
+        # Handle exceptions TODO: We need to move QBOX to main thread
         except DeadlineExceeded:
             QMessageBox.warning(self, "Timeout", "The request to the Gemini API timed out. Try increasing the timeout setting or reducing the complexity of your request. You are not charged when this happens. Please note that this message was still added to history, so delete it if you wish.")
             self.chat.history.append({'parts': [{'text': message}], 'role': 'user'})
