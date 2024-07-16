@@ -8,7 +8,7 @@ from dotenv import load_dotenv, set_key
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from google.api_core.exceptions import DeadlineExceeded, InvalidArgument
 from PyQt6.QtWidgets import ( QApplication, QMainWindow, QProgressBar, QWidget, QPushButton, QScrollArea, QLabel, QVBoxLayout, QLineEdit, QMessageBox, QFileDialog, QTextEdit,
-                              QFontDialog, QColorDialog, QInputDialog, QListWidget, QStatusBar, QHBoxLayout, QComboBox, QSpinBox, QDoubleSpinBox, QDialog
+                              QFontDialog, QColorDialog, QInputDialog, QListWidget, QStatusBar, QHBoxLayout, QComboBox, QSpinBox, QDoubleSpinBox, QDialog, QSizePolicy
                             )
 from PyQt6.QtCore import Qt, QSize, QEvent, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import QFont, QColor, QAction
@@ -288,7 +288,7 @@ class MainWindow(QMainWindow):
         )
 
         if reply == QMessageBox.StandardButton.No:
-            QApplication.quit() # Close the application if the user rejects the agreement
+            sys.exit()   # Exit program if user does not agree to terms and conditions
 
     def send_message(self, files = False):
         """Sends the user's message to the Gemini model and handles the response."""
@@ -729,6 +729,9 @@ class MainWindow(QMainWindow):
     def create_input_area(self):
         """Creates the input area for user messages."""
         self.input_box = QTextEdit()
+        self.input_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum )
+        self.input_box.setMinimumHeight(self.input_box.fontMetrics().lineSpacing() + 6)
+        self.input_box.setMaximumHeight(self.input_box.fontMetrics().lineSpacing() * 8 ) # Ensure it can handle multiple lines of text
         self.input_box.installEventFilter(self) # Install event filter for Ctrl+Enter handling
         # TODO: adjust height of input box, should be small but expandable
         self.layout.addWidget(self.input_box)
