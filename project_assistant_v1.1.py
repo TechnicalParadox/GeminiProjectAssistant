@@ -474,12 +474,14 @@ class MainWindow(QMainWindow):
             if DEBUG:
                 print(f"DeadlineExceeded: Request timed out after {timeout} seconds.", tag='Debug', tag_color='red') # Log the timeout
             self.request_in_progress = False # Allow new requests
+            self.progress_bar.setFormat("Response Timed Out")
             return None, input_tokens
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred: {e}")
             if DEBUG:
                 print(f"Error sending message: {e}", tag='Debug', tag_color='red')
             self.request_in_progress = False # Allow new requests
+            self.progress_bar.setFormat("Response Error")
             return None, input_tokens
     
     def send_message_thread(self, message, timeout):
@@ -499,6 +501,7 @@ class MainWindow(QMainWindow):
     def handle_response(self, response, input_tokens):
         """Handles the response from the model."""
         self.request_in_progress = False # Allow new requests
+        self.progress_bar.setFormat("Response Received")
         self.response_receieved.emit(response, input_tokens) # Emit signal with response and input tokens
     
     def update_ui_with_response(self, response, input_tokens):
@@ -736,7 +739,6 @@ class MainWindow(QMainWindow):
         self.progress_bar = QProgressBar(self)
         self.progress_bar.setFixedWidth(200) # Set a fixed width for the progress bar
         self.progress_bar.setMaximum(self.timeout) # Set the maximum value of the progress bar
-        self.progress_bar.setTextVisible(False) # Hide the text on the progress bar
         self.status_bar.addPermanentWidget(self.progress_bar) # Add the progress bar to the status bar
 
     def update_progress_bar(self):
