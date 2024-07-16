@@ -6,8 +6,10 @@ import google.generativeai as genai
 from dotenv import load_dotenv, set_key
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from google.api_core.exceptions import DeadlineExceeded, InvalidArgument
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QScrollArea, QLabel, QVBoxLayout, QLineEdit, QMessageBox, QFileDialog, QTextEdit, QFontDialog, QColorDialog, QInputDialog, QListWidget, QStatusBar, QHBoxLayout, QComboBox, QSpinBox, QDoubleSpinBox, QDialog
-from PyQt6.QtCore import Qt, QSize, QEvent
+from PyQt6.QtWidgets import ( QApplication, QMainWindow, QProgressBar, QWidget, QPushButton, QScrollArea, QLabel, QVBoxLayout, QLineEdit, QMessageBox, QFileDialog, QTextEdit,
+                              QFontDialog, QColorDialog, QInputDialog, QListWidget, QStatusBar, QHBoxLayout, QComboBox, QSpinBox, QDoubleSpinBox, QDialog
+                            )
+from PyQt6.QtCore import Qt, QSize, QEvent, QTimer
 from PyQt6.QtGui import QFont, QColor, QAction
 
 DEBUG = True  # Set to True to enable debug messages
@@ -388,6 +390,12 @@ class MainWindow(QMainWindow): # TODO: Catch exit and ask if they need to save
     def send_message_to_model(self, message, timeout): # TODO: Handle other exceptions appropriately, Safety exception for example
         """Sends the message to the Gemini model and handles the response."""
         try:
+            # Start the progress bar animation # TODO: We need to implement send_message_async to avoid blocking the UI thread
+            self.progress_bar.setMaximum(timeout) # Set the maximum value of the progress bar
+            self.timer = QTimer(self) # Create a QTimer instance
+            self.timer.timeout.connect(self.update_progress_bar) # Connect the timeout signal to the update_progress_bar method
+            self.timer.start(1000) # Start the timer with a 1 second interval
+
             # Calculate token counts for the user's message and subtract system instructions tokens
             total_message_tokens = self.model.count_tokens([{'role': 'user', 'parts':[message]}]).total_tokens
             input_tokens = total_message_tokens - self.system_instruction_tokens
@@ -426,15 +434,20 @@ class MainWindow(QMainWindow): # TODO: Catch exit and ask if they need to save
 
             self.update_status_bar()
 
+            self.progress_bar.setValue(self.progress_bar.maximum()) # Indicate successful completion
+
             return self.last_input_tokens, self.last_output_tokens, response.text
         except DeadlineExceeded:
             QMessageBox.warning(self, "Timeout", "The request to the Gemini API timed out. Try increasing the timeout setting or reducing the complexity of your request. You are not charged when this happens. Please note that this message was still added to history, so delete it if you wish.")
             self.chat.history.append({'parts': [{'text': message}], 'role': 'user'})
             if DEBUG:
                 print(f"DeadlineExceeded: Request timed out after {timeout} seconds.", tag='Debug', tag_color='red') # Log the timeout
+            self.progress_bar.setValue(self.progress_bar.maximum()) # Indicate Timeout
         except Exception as e:
+            QMessageBox.critical(self, "Error", f"An error occurred: {e}")
             if DEBUG:
                 print(f"Error sending message: {e}", tag='Debug', tag_color='red')
+            self.progress_bar.setValue(self.progress_bar.maximum()) # Reset the progress bar
             raise e
 
     def display_message(self, sender, message): # TODO: This doesn't auto scroll to bottom when new messages are added
@@ -649,6 +662,19 @@ class MainWindow(QMainWindow): # TODO: Catch exit and ask if they need to save
         """Creates the status bar."""
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
+
+        # Create a progress bar
+        self.progress_bar = QProgressBar(self)
+        self.progress_bar.setMaximum(self.timeout) # Set the maximum value of the progress bar
+        self.progress_bar.setTextVisible(False) # Hide the text on the progress bar
+        self.status_bar.addPermanentWidget(self.progress_bar) # Add the progress bar to the status bar
+
+    def update_progress_bar(self):
+        """Updates the progress bar."""
+        current_value = self.progress_bar.value()
+        self.progress_bar.setValue(current_value + 1)  # Increment progress
+        if current_value >= self.progress_bar.maximum():
+            self.timer.stop()
 
     def load_api_key(self):
         """Loads the API key from the .env file. If not found,
