@@ -297,10 +297,13 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Request in Progress", "A request is already in progress. Please wait for the current request to complete.")
             return
         
-        self.request_in_progress = True
-
         user_input = self.input_box.toPlainText().strip()
+        if not user_input: # Check if the input is empty
+            return # Do nothing if the input is empty
+        
         self.input_box.clear()
+
+        self.request_in_progress = True
 
         # Add messages to history for display and saving BEFORE sending the request
         total_message_tokens = self.model.count_tokens([{'role': 'user', 'parts':[user_input]}]).total_tokens
