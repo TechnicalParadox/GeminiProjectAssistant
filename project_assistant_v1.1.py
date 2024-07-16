@@ -290,17 +290,20 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.StandardButton.No:
             QApplication.quit() # Close the application if the user rejects the agreement
 
-    def send_message(self):
+    def send_message(self, files = False):
         """Sends the user's message to the Gemini model and handles the response."""
         if self.request_in_progress:
             QMessageBox.warning(self, "Request in Progress", "A request is already in progress. Please wait for the current request to complete.")
             return
         
-        user_input = self.input_box.toPlainText().strip()
-        if not user_input: # Check if the input is empty
-            return # Do nothing if the input is empty
-        
-        self.input_box.clear()
+        if not files:
+            user_input = self.input_box.toPlainText().strip()
+            if not user_input: # Check if the input is empty
+                return # Do nothing if the input is empty
+            
+            self.input_box.clear()
+        else:
+            user_input = self.files_context + self.files_message.strip()
 
         self.request_in_progress = True
 
@@ -308,7 +311,13 @@ class MainWindow(QMainWindow):
         total_message_tokens = self.model.count_tokens([{'role': 'user', 'parts':[user_input]}]).total_tokens
         input_tokens = total_message_tokens - self.system_instruction_tokens
         self.messages.append({"role": "User", "content": user_input, "tokens": input_tokens})  # Store message in messages
-        self.display_message("User", user_input)  # Display the user message in the chat history
+
+        if not files:
+            self.display_message("User", user_input)  # Display the user message in the chat history
+        else:
+            self.display_message("User", self.files_message)
+            self.files_message = ""  # Reset files_message for next file uploads
+            self.files_context = ""   # Reset files_context for next file uploads
 
         # Start the progress bar
         self.progress_bar.setValue(0)
@@ -389,6 +398,9 @@ class MainWindow(QMainWindow):
                 try:
                     with open(file, 'r', errors='ignore') as f:
                         content = f.read()
+                        # Get absolute file path
+                        file_path = os.path.abspath(file)
+                        files_context += ("File: " + file_path + '\n')
                         files_context += ('```' + content + '```\n') # TODO: Should add filepath before content
                         messages_to_display.append(f"{file} was sent to model.")  # Display only the file path
                 except Exception as e:
@@ -404,8 +416,9 @@ class MainWindow(QMainWindow):
             if ok and user_message:
                 for message in messages_to_display:
                     self.display_message('File', message)
-                # TODO: Create a seperate function for sending files and user message, so that files arent displayed in chat, we can pass files context and user message seperately, and only display user message
-                self.send_message_to_model((files_context + user_message), self.timeout)  # Send the user message to the model
+                self.files_context = files_context
+                self.files_message = user_message
+                self.send_message(True)  # Send the user message to the model
 
     def display_chat_history(self):
         """Displays a concise chat history in a larger message box."""
