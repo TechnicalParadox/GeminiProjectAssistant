@@ -726,6 +726,15 @@ class MainWindow(QMainWindow):
         self.chat_window.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth) # Ensure text wraps within the widget's width
         self.layout.addWidget(self.chat_window)
 
+    def update_chat_window(self):
+        """Updates the chat window with the current chat history."""
+        full_html = ""  # Initialize an empty string for the full HTML content
+        for message in self.chat_history: 
+            full_html += message # Append each formatted message to the full_html
+        self.chat_window.setHtml(full_html)  # Set the HTML content of the QTextEdit
+
+        self.chat_window.verticalScrollBar().setValue(self.chat_window.verticalScrollBar().maximum()) # Scroll to the bottom of the chat window
+
     def create_input_area(self):
         """Creates the input area for user messages."""
         self.input_box = QTextEdit()
@@ -852,13 +861,6 @@ class MainWindow(QMainWindow):
             self.initialize_model()
             self.chat = self.model.start_chat()
             self.display_message('System', 'Settings updated.') # Inform the user that the settings have been updated
-
-    def update_chat_window(self):
-        """Updates the chat window with the current chat history."""
-        full_html = ""  # Initialize an empty string for the full HTML content
-        for message in self.chat_history: 
-            full_html += message # Append each formatted message to the full_html
-        self.chat_window.setHtml(full_html)  # Set the HTML content of the QTextEdit
 
     def update_status_bar(self): # TODO: Make permanent widget instead of message so it doesn't clear when hovering over menu bar.
         """Updates the status bar with session information."""
