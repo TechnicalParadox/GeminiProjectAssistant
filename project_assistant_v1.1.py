@@ -2,6 +2,8 @@ import sys
 import os
 import json
 import asyncio
+import re
+import markdown2 # TODO: Remove dependency
 from print_color import print
 import google.generativeai as genai
 from dotenv import load_dotenv, set_key
@@ -543,6 +545,12 @@ class MainWindow(QMainWindow):
                 color = "green" 
             case "Model":
                 color = "cyan"
+                # Replace code blocks with <pre> tags
+                message = re.sub(r'```(.*?)```', r'<pre>\1</pre>', message, flags=re.DOTALL)
+                # Replace bold text with <strong> tags
+                message = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', message)
+                # Replace italic text with <em> tags
+                message = re.sub(r'_(.*?)_', r'<em>\1</em>', message)
             case "Error":
                 color = "red" 
             case "Warning":
@@ -550,7 +558,7 @@ class MainWindow(QMainWindow):
             case _:
                 color = "magenta" 
 
-        formatted_message = f"<p style='margin: 0px;'><strong style='color:{color};'>{sender}:</strong> <span style='white-space: pre-wrap;'>{message}</span></p><hr style='width: 100%; border-top: 1px;'>"
+        formatted_message = f"<hr style='width: 100%; border-top: 1px;'><p style='margin: 0px;'><strong style='color:{color};'>{sender}:</strong> <span style='white-space: pre-wrap;'>{message}</span></p>"
         self.chat_history.append(formatted_message) # Append to chat_history list
         self.update_chat_window() # Update the chat window
 
