@@ -550,7 +550,7 @@ class MainWindow(QMainWindow):
             case _:
                 color = "magenta" 
 
-        formatted_message = f"<p style='margin: 0px;'><strong style='color:{color};'>{sender}:</strong> {message}</p><hr style='width: 100%; border-top: 1px;'>"
+        formatted_message = f"<p style='margin: 0px;'><strong style='color:{color};'>{sender}:</strong> <span style='white-space: pre-wrap;'>{message}</span></p><hr style='width: 100%; border-top: 1px;'>"
         self.chat_history.append(formatted_message) # Append to chat_history list
         self.update_chat_window() # Update the chat window
 
