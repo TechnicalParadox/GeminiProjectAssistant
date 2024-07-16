@@ -129,7 +129,7 @@ def calculate_cost(tokens, pricing, messages):
         return million_tokens * pricing['over_128k'] # Calculate cost using the higher tier pricing
 
 
-class MainWindow(QMainWindow): # TODO: Catch exit and ask if they need to save
+class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
@@ -229,6 +229,24 @@ class MainWindow(QMainWindow): # TODO: Catch exit and ask if they need to save
                 self.send_message()
                 return True
         return super().eventFilter(source, event)
+
+    def closeEvent(self, event):
+        """Handles the close event of the main window."""
+        reply = QMessageBox.question(
+            self,
+            "Confirm Exit",
+            "Are you sure you want to exit?<br>Do you want to save the chat history?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel  # Set Cancel as the default button
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            self.save_chat_history()  # Save the chat history if the user chooses Yes
+            event.accept()  # Allow the window to close
+        elif reply == QMessageBox.StandardButton.No:  # Exit without saving
+            event.accept()
+        else:
+            event.ignore()  # Prevent the window from closing if the user chooses Cancel
 
     def show_warnings_and_agreement(self):
         """Displays warnings and the user agreement, asking for acceptance."""
