@@ -3,7 +3,6 @@ import os
 import json
 import asyncio
 import re
-import markdown2 # TODO: Remove dependency
 from print_color import print
 import google.generativeai as genai
 from dotenv import load_dotenv, set_key
@@ -222,7 +221,6 @@ class MainWindow(QMainWindow):
         self.display_message("Pricing", f"Pricing as of {PRICING_DATE} for {PRICING_MODEL}:")
         self.display_message("Input", f"${INPUT_PRICING['upto_128k']} per million tokens (up to 128k tokens), ${INPUT_PRICING['over_128k']} per million tokens (over 128k tokens).")
         self.display_message("Output", f"${OUTPUT_PRICING['upto_128k']} per million tokens (up to 128k tokens), ${OUTPUT_PRICING['over_128k']} per million tokens (over 128k tokens).")
-
 
         # Display settings after UI setup
         self.display_loaded_settings()
@@ -506,7 +504,7 @@ class MainWindow(QMainWindow):
 
         self.progress_bar.setValue(self.progress_bar.maximum())  # Indicate successful completion
 
-    def display_message(self, sender, message): # TODO: This doesn't auto scroll to bottom when new messages are added
+    def display_message(self, sender, message):
         """Appends the formatted message to the chat_history."""
         color = ""
         match sender:
@@ -859,7 +857,7 @@ class MainWindow(QMainWindow):
                 "API Key", "API Key not set. Using the existing key from .env."
             )
 
-    def configure_settings(self): # TODO: If config.json doesn't exist, populate these with default values from init
+    def configure_settings(self):
         """Allows the user to configure application settings."""
         dialog = SettingsDialog(self) # Create an instance of the SettingsDialog
         if dialog.exec() == QDialog.accepted: # Use exec() instead of show() to run the dialog modally
@@ -1030,7 +1028,7 @@ class MessageDialog(QDialog):
 
         self.setMinimumSize(800, 400)  # Ensure a minimum size 
 
-class SettingsDialog(QDialog):
+class SettingsDialog(QDialog): # TODO: If config.json doesn't exist, populate these with default values from init
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Configuration")
@@ -1147,7 +1145,20 @@ class SettingsDialog(QDialog):
                 self.system_instructions_edit.setPlainText(config.get('system_instructions', self.parent().system_instructions)) # Use setPlainText for QTextEdit
         except FileNotFoundError:
             # Handle case where file doesn't exist (e.g., first time running)
+
+            # If config.json is not found, use default values from MainWindow
+            self.model_combo.setCurrentText(self.parent().model_name)
+            self.safety_combo.setCurrentText(self.parent().safety_level.capitalize())
+            self.timeout_spin.setValue(self.parent().timeout)
+            self.project_dir_edit.setText(self.parent().project_dir)
+            self.ignored_extensions_edit.setText(", ".join(self.parent().ignored_extensions))
+            self.temperature_spin.setValue(self.parent().temperature)
+            self.max_output_tokens_spin.setValue(self.parent().max_output_tokens)
+            self.stop_sequences_edit.setText(", ".join(self.parent().stop_sequences))
+            self.system_instructions_edit.setPlainText(self.parent().system_instructions)
+
             QMessageBox.warning(self, "Warning", "Configuration file not found. Using default settings.")
+            # TODO: Ensure this opens in center of screen
         except Exception as e:
             # Handle other potential errors during file loading
             QMessageBox.critical(self, "Error", f"An error occurred while loading the settings: {e}")
