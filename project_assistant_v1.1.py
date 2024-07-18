@@ -516,7 +516,7 @@ class MainWindow(QMainWindow):
             case "Model":
                 color = "cyan"
                 # Replace code blocks with <pre> tags
-                message = re.sub(r'```(.*?)```', r'<pre>\1</pre>', message, flags=re.DOTALL)
+                message = re.sub(r'```(.*?)```', r"<span style='white-space: pre-wrap;'>\1</span>", message, flags=re.DOTALL)
                 # Replace bold text with <strong> tags
                 message = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', message)
                 # Replace italic text with <em> tags
@@ -547,7 +547,7 @@ class MainWindow(QMainWindow):
                 else:
                     prefix = f'<strong style="color:cyan;">Model:</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
 
-                message_dialog = ViewMessageDialog("Message Content", (prefix + f'<pre>{message['content']}</pre>'))
+                message_dialog = ViewMessageDialog("Message Content", (prefix + f"<span style='white-space: pre-wrap;'>{message['content']}</span>"))
                 message_dialog.exec()
             except IndexError:
                 self.display_message("Error", "Invalid message index.")
@@ -558,14 +558,14 @@ class MainWindow(QMainWindow):
         total_cost = 0.0
         for i, m in enumerate(self.messages):
             # Calculate message content preview, removing newlines
-            content_preview = m['content'][:75] + ' ... ' + m['content'][-75:] if len(m['content']) > 150 else m['content']
+            content_preview = m['content'][:100] + ' ... ' + m['content'][-100:] if len(m['content']) > 200 else m['content']
             content_preview = content_preview.replace('\n', ' ')
             input_cost = calculate_cost(m['tokens'], INPUT_PRICING, self.messages) # Calculate cost to keep message
             total_cost += input_cost
             
             # Apply color based on message role 
             color = "green" if m['role'] == "User" else "cyan"
-            history_text.append(f"{i+1}. <span style='color:{color};'>{m['role']}:</span> Tokens: {m['tokens']}, Cost to keep: ${input_cost:.5f} | {content_preview}")
+            history_text.append(f"<hr style='width: 100%; border-top: 1px;'>{i+1}. <strong><span style='color:{color};'>{m['role']}:</span>, Tokens: {m['tokens']}, Cost to keep: ${input_cost:.5f}</strong><br><span style='white-space: pre-wrap;'>{content_preview}</span>")
         history_text.append(f"<hr><strong>Total cost to keep: ${total_cost:.5f}</strong>")
 
         if DEBUG:
