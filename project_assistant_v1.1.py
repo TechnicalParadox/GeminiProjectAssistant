@@ -309,7 +309,8 @@ class MainWindow(QMainWindow):
             
             self.input_box.clear()
         else:
-            user_input = self.files_context + self.files_message.strip()
+            user_message = '<None>' if self.files_message == '' else self.files_message
+            user_input = self.files_context + user_message
 
         self.request_in_progress = True
 
@@ -321,7 +322,8 @@ class MainWindow(QMainWindow):
         if not files:
             self.display_message("User", user_input)  # Display the user message in the chat history
         else:
-            self.display_message("User", self.files_message)
+            if self.files_message != "":
+                self.display_message("User", self.files_message)
             self.files_message = ""  # Reset files_message for next file uploads
             self.files_context = ""   # Reset files_context for next file uploads
 
@@ -396,7 +398,7 @@ class MainWindow(QMainWindow):
             else: # Home directory not found, display error
                 self.display_message("Error", "Set the project directory to add files to the context.")
 
-        if file_dialog.exec(): # TODO: Force file dialog to open in front of chat window
+        if file_dialog.exec():
             selected_files = file_dialog.selectedFiles()
             messages_to_display = []
             files_context = "Files from the user: "
@@ -415,11 +417,12 @@ class MainWindow(QMainWindow):
             files_context += '\nUser message: '
 
             # Get additional user input after adding files
-            # TODO: Change ok button to say send
-            user_message, ok = QInputDialog.getMultiLineText(
-                self, "Input", "Enter your message:"
-            )
-            if ok and user_message:
+            user_message = None
+            dialog = MessageInputDialog(self)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                user_message = dialog.message_edit.toPlainText().strip()
+
+            if user_message != None:
                 for message in messages_to_display:
                     self.display_message('File', message)
                 self.files_context = files_context
@@ -543,7 +546,8 @@ class MainWindow(QMainWindow):
                     prefix = f'<strong style="color:green;">User:</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
                 else:
                     prefix = f'<strong style="color:cyan;">Model:</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
-                message_dialog = MessageDialog("Message Content", (prefix + f'<pre>{message['content']}</pre>'))
+
+                message_dialog = ViewMessageDialog("Message Content", (prefix + f'<pre>{message['content']}</pre>'))
                 message_dialog.exec()
             except IndexError:
                 self.display_message("Error", "Invalid message index.")
@@ -567,7 +571,7 @@ class MainWindow(QMainWindow):
         if DEBUG:
             print('Model Chat History:', self.chat.history, tag='Debug', tag_color='cyan', color='white')
 
-        history_dialog = MessageDialog("Chat History", "<br>".join(history_text))
+        history_dialog = ViewMessageDialog("Chat History", "<br>".join(history_text))
         history_dialog.exec()
 
     def load_chat_history(self):
@@ -1001,7 +1005,34 @@ class MainWindow(QMainWindow):
             self.update_chat_window()  # Update the chat window
             self.update_status_bar()  # Update the status bar
 
-class MessageDialog(QDialog):
+class MessageInputDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Enter Message")
+
+        layout = QVBoxLayout(self)
+
+        self.message_edit = QTextEdit(self)
+        layout.addWidget(self.message_edit)
+
+        button_box = QHBoxLayout()
+        send_button = QPushButton("Send", self)
+        send_button.clicked.connect(self.accept_input)
+        button_box.addWidget(send_button)
+
+        cancel_button = QPushButton("Cancel", self)
+        cancel_button.clicked.connect(self.reject_input)
+        button_box.addWidget(cancel_button)
+
+        layout.addLayout(button_box)
+
+    def accept_input(self):
+        self.accept()
+    
+    def reject_input(self):
+        self.reject()
+
+class ViewMessageDialog(QDialog):
     def __init__(self, title, text, parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
