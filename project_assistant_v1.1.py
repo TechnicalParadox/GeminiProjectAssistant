@@ -543,7 +543,7 @@ class MainWindow(QMainWindow):
                     prefix = f'<strong style="color:green;">User:</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
                 else:
                     prefix = f'<strong style="color:cyan;">Model:</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
-                message_dialog = MessageDialog("Message Content", (prefix + message['content']))
+                message_dialog = MessageDialog("Message Content", (prefix + f'<pre>{message['content']}</pre>'))
                 message_dialog.exec()
             except IndexError:
                 self.display_message("Error", "Invalid message index.")
