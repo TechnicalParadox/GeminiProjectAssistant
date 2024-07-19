@@ -409,7 +409,7 @@ class MainWindow(QMainWindow):
                         # Get absolute file path
                         file_path = os.path.abspath(file)
                         files_context += ("File: " + file_path + '\n')
-                        files_context += ('```' + content + '```\n') # TODO: Should add filepath before content
+                        files_context += ('```' + content + '```\n')
                         messages_to_display.append(f"{file} was sent to model.")  # Display only the file path
                 except Exception as e:
                     self.display_message("Error", f"Error reading file {file}: {e}")
