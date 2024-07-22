@@ -383,11 +383,12 @@ class MainWindow(QMainWindow):
             except ValueError:
                 self.display_message("Error", "Invalid input. Enter message indices as comma-separated numbers.")
     
-    def add_files_to_context(self): # TODO: Add functionality for ignored files and file extensions, add ability to send in project file structure.
+    def add_files_to_context(self): # TODO: Add functionality for ignored files and file extensions
         """Adds files to the chat context."""
 
         file_dialog = QFileDialog()
         file_dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
+        file_dialog.setWindowTitle("Select Files to Send")
 
         # Set the project directory if available, otherwise default to user's home directory if available
         if self.project_dir:
@@ -398,36 +399,67 @@ class MainWindow(QMainWindow):
             else: # Home directory not found, display error
                 self.display_message("Error", "Set the project directory to add files to the context.")
 
-        if file_dialog.exec():
-            selected_files = file_dialog.selectedFiles()
-            messages_to_display = []
-            files_context = "Files from the user: "
-            for file in selected_files:
-                try:
-                    with open(file, 'r', errors='ignore') as f:
-                        content = f.read()
-                        # Get absolute file path
-                        file_path = os.path.abspath(file)
-                        files_context += ("File: " + file_path + '\n')
-                        files_context += ('```' + content + '```\n')
-                        messages_to_display.append(f"{file} was sent to model.")  # Display only the file path
-                except Exception as e:
-                    self.display_message("Error", f"Error reading file {file}: {e}")
-            
-            files_context += '\nUser message: '
+        # Ask if they want to send in their project directory file tree
+        msg_box = QMessageBox()
+        msg_box.setWindowTitle('Send File Tree?')
+        msg_box.setIcon(QMessageBox.Icon.Question)
+        msg_box.setText(f"Would you like to send in a tree of all files (except ignored files/extensions) in your project directory?: {self.project_dir}")
+        msg_box.addButton(QMessageBox.StandardButton.Yes)
+        msg_box.addButton(QMessageBox.StandardButton.No)
+        reply = msg_box.exec()
 
-            # Get additional user input after adding files
-            user_message = None
-            dialog = MessageInputDialog(self)
-            if dialog.exec() == QDialog.DialogCode.Accepted:
-                user_message = dialog.message_edit.toPlainText().strip()
+        messages_to_display = []
 
-            if user_message != None:
-                for message in messages_to_display:
-                    self.display_message('File', message)
-                self.files_context = files_context
-                self.files_message = user_message
-                self.send_message(True)  # Send the user message to the model
+        files_context = ""
+        if reply == QMessageBox.StandardButton.Yes:
+            files_context += "Project directory tree: \n"
+            normalized_ignored_items = [f'.{item.strip().lstrip(".")}' if not '.' in item else item.strip() for item in self.ignored_extensions] 
+            for root, dirs, files in os.walk(self.project_dir):
+                dirs[:] = [d for d in dirs if not d.startswith('.')] 
+                for file in files:
+                    if not file.startswith('.') and not any(file.endswith(item) or file == item for item in normalized_ignored_items): 
+                        file_path = os.path.join(root, file)
+                        files_context += (file_path + '\n')
+            messages_to_display.append("Project directory tree was sent to the model.")
+
+        add_files = True
+        while(add_files): # While the user wants to add files, loop
+            if file_dialog.exec():
+                selected_files = file_dialog.selectedFiles()
+                files_context += "Files from the user: "
+                for file in selected_files:
+                    try:
+                        with open(file, 'r', errors='ignore') as f:
+                            content = f.read()
+                            # Get absolute file path
+                            file_path = os.path.abspath(file)
+                            files_context += ("File: " + file_path + '\n')
+                            files_context += ('```' + content + '```\n')
+                            messages_to_display.append(f"{file} was sent to model.")  # Display only the file path
+                    except Exception as e:
+                        self.display_message("Error", f"Error reading file {file}: {e}")
+            # Ask if user wants to add more files.
+            msg_box.setWindowTitle('Add more files?')
+            msg_box.setIcon(QMessageBox.Icon.Question)
+            msg_box.setText(f"Would you like to add more files?")
+            reply = msg_box.exec()
+            add_files = True if reply == QMessageBox.StandardButton.Yes else False
+
+
+        files_context += '\nUser message: '
+
+        # Get additional user input after adding files
+        user_message = None
+        dialog = MessageInputDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            user_message = dialog.message_edit.toPlainText().strip()
+
+        if user_message != None:
+            for message in messages_to_display:
+                self.display_message('File', message)
+            self.files_context = files_context
+            self.files_message = user_message
+            self.send_message(True)  # Send the user message to the model
     
     async def send_message_async(self, message, timeout):
         """Sends the message asynchronously to the Gemini model and handles the response."""
@@ -691,7 +723,7 @@ class MainWindow(QMainWindow):
         delete_action.triggered.connect(self.delete_messages)
         tools_menu.addAction(delete_action)
 
-        files_action = QAction("Add Files to Context", self)
+        files_action = QAction("Add Files/Paths to Context", self)
         files_action.setShortcut("Ctrl+F")
         files_action.triggered.connect(self.add_files_to_context)
         tools_menu.addAction(files_action)
@@ -1008,7 +1040,8 @@ class MainWindow(QMainWindow):
 class MessageInputDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Enter Message")
+        self.setWindowTitle("Enter Message (Cancel to not send files)")
+        self.setMinimumWidth(500)
 
         layout = QVBoxLayout(self)
 
