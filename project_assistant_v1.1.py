@@ -575,11 +575,11 @@ class MainWindow(QMainWindow):
                 prefix = ''
                 print(message)
                 if message['role'] == 'User':
-                    prefix = f'<strong style="color:green;">User:</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
+                    prefix = f'<strong style="color:green;">User</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
                 else:
-                    prefix = f'<strong style="color:cyan;">Model:</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
+                    prefix = f'<strong style="color:cyan;">Model</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
 
-                message_dialog = ViewMessageDialog("Message Content", (prefix + f"<span style='white-space: pre-wrap;'>{message['content']}</span>"))
+                message_dialog = ViewMessageDialog("Message Content", (prefix + f"<span style='white-space: pre-wrap;'>{message['content']}</span>"), message)
                 message_dialog.exec()
             except IndexError:
                 self.display_message("Error", "Invalid message index.")
@@ -1066,11 +1066,12 @@ class MessageInputDialog(QDialog):
         self.reject()
 
 class ViewMessageDialog(QDialog):
-    def __init__(self, title, text, parent=None):
+    def __init__(self, title, text, message, parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
 
         layout = QVBoxLayout(self)
+        self.message = message
 
         # Create a QTextEdit to display the message
         self.message_text = QTextEdit(self)
@@ -1085,12 +1086,27 @@ class ViewMessageDialog(QDialog):
         # Add the scroll area to the layout
         layout.addWidget(scroll_area)
 
+
+        button_bar = QHBoxLayout(self)
+
+        # Create a save message button
+        save_button = QPushButton("Save", self)
+        save_button.clicked.connect(self.save_message)
+        button_bar.addWidget(save_button)
+
         # Create a close button
         close_button = QPushButton("Close", self)
         close_button.clicked.connect(self.close)
-        layout.addWidget(close_button)
+        close_button.setDefault(True)
+        button_bar.addWidget(close_button)
+
+        layout.addLayout(button_bar)
 
         self.setMinimumSize(800, 400)  # Ensure a minimum size 
+    
+    def save_message(self):
+        print(self.message)
+        # TODO: save message by opening file dialog
 
 class SettingsDialog(QDialog): # TODO: If config.json doesn't exist, populate these with default values from init
     def __init__(self, parent=None):
