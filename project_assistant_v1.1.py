@@ -484,7 +484,7 @@ class MainWindow(QMainWindow):
 
             return response, input_tokens
 
-        # Handle exceptions TODO: We need to move QBOX to main thread
+        # Handle exceptions TODO: We need to move QBOX popups to main thread to prevent crashing
         except DeadlineExceeded:
             QMessageBox.warning(self, "Timeout", "The request to the Gemini API timed out. Try increasing the timeout setting or reducing the complexity of your request. You are not charged when this happens. Please note that this message was still added to history, so delete it if you wish.")
             self.chat.history.append({'parts': [{'text': message}], 'role': 'user'})
@@ -573,7 +573,7 @@ class MainWindow(QMainWindow):
             try:
                 message = self.messages[message_index - 1] # Adjust for zero-based indexing
                 prefix = ''
-                print(message)
+                print(f'Viewing message: {message}', tag='Debug', tag_color='cyan', color='white')
                 if message['role'] == 'User':
                     prefix = f'<strong style="color:green;">User</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
                 else:
@@ -704,7 +704,7 @@ class MainWindow(QMainWindow):
         file_menu = menu_bar.addMenu("File")
 
         load_action = QAction("Load History Into Current Session", self)
-        load_action.setShortcut("Ctrl+L") # TODO: Fix, opens file dialog behind chat window, even though save doesn't
+        load_action.setShortcut("Ctrl+L")
         load_action.triggered.connect(self.load_chat_history)
         file_menu.addAction(load_action)
 
@@ -792,7 +792,6 @@ class MainWindow(QMainWindow):
         self.adjust_input_box_height()  # Adjust initial size to fit text
 
         self.input_box.installEventFilter(self) # Install event filter for Ctrl+Enter handling
-        # TODO: adjust height of input box, should be small but expandable
         self.layout.addWidget(self.input_box)
 
         # Create a horizontal layout for the input box and send button
@@ -1086,7 +1085,6 @@ class ViewMessageDialog(QDialog):
         # Add the scroll area to the layout
         layout.addWidget(scroll_area)
 
-
         button_bar = QHBoxLayout(self)
 
         # Create a save message button
@@ -1105,10 +1103,45 @@ class ViewMessageDialog(QDialog):
         self.setMinimumSize(800, 400)  # Ensure a minimum size 
     
     def save_message(self):
-        print(self.message)
-        # TODO: save message by opening file dialog
+        print(f'Saving message: {self.message}', tag='Debug', tag_color='cyan', color='white')
 
-class SettingsDialog(QDialog): # TODO: If config.json doesn't exist, populate these with default values from init
+        # Dialog for file type selection
+        file_formats = ["JSON (*.json)", "Text (*.txt)", "Markdown (*.md)", "CSV (*.csv)"]
+        selected_filter, ok = QInputDialog.getItem(self, "Choose File Format", "Select a file format:", file_formats, 0, False)
+        if not ok:
+            return  # User canceled the dialog
+
+        file_dialog = QFileDialog(self)
+        file_dialog.setNameFilter(selected_filter)  # Set the selected filter
+        file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+
+        if file_dialog.exec():
+            filename = file_dialog.selectedFiles()[0]
+            role = self.message['role']
+            tokens = self.message['tokens']
+            content = self.message['content']
+
+            try:
+                with open(filename, "w") as f:
+                    match selected_filter:
+                        case "JSON (*.json)":
+                            json.dump(self.message, f, indent=4)
+                        case "Text (*.txt)":
+                            f.write(f"{role}, {tokens} tokens - {content}\n")
+                        case "Markdown (*.md)":
+                            f.write(f"### {role}, {tokens} tokens\n")
+                            f.write(f"{content}")
+                        case "CSV (*.csv)":
+                            f.write("Role,Tokens,Content\n")
+                            f.write(f"{role},{tokens},{content}")
+                        case _:
+                            raise ValueError("Invalid file format")
+                # TODO: Pop up message saved successfully
+            except Exception as e:
+                print(f'Error: {e}', tag='Debug', tag_color='cyan', color='white')
+                # TODO: Pop up error occured
+
+class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Configuration")
@@ -1238,7 +1271,6 @@ class SettingsDialog(QDialog): # TODO: If config.json doesn't exist, populate th
             self.system_instructions_edit.setPlainText(self.parent().system_instructions)
 
             QMessageBox.warning(self, "Warning", "Configuration file not found. Using default settings.")
-            # TODO: Ensure this opens in center of screen
         except Exception as e:
             # Handle other potential errors during file loading
             QMessageBox.critical(self, "Error", f"An error occurred while loading the settings: {e}")
