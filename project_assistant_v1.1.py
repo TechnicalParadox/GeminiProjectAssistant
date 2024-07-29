@@ -1,3 +1,4 @@
+import traceback
 import sys
 import os
 import json
@@ -6,7 +7,7 @@ import re
 from print_color import print
 import google.generativeai as genai
 from dotenv import load_dotenv, set_key
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from google.generativeai.types import HarmCategory, HarmBlockThreshold, generation_types
 from google.api_core.exceptions import DeadlineExceeded, InvalidArgument
 from PyQt6.QtWidgets import ( QApplication, QMainWindow, QProgressBar, QWidget, QPushButton, QScrollArea, QLabel, QVBoxLayout, QLineEdit, QMessageBox, QFileDialog, QTextEdit,
                               QFontDialog, QColorDialog, QInputDialog, QListWidget, QStatusBar, QHBoxLayout, QComboBox, QSpinBox, QDoubleSpinBox, QDialog, QSizePolicy
@@ -482,33 +483,36 @@ class MainWindow(QMainWindow):
             if DEBUG:
                 print("Full response from model:", response, tag='Debug', tag_color='cyan', color='white') 
 
-            return response, input_tokens
+            return response, input_tokens, None
 
         # Handle exceptions TODO: We need to move QBOX popups to main thread to prevent crashing
-        except DeadlineExceeded:
-            QMessageBox.warning(self, "Timeout", "The request to the Gemini API timed out. Try increasing the timeout setting or reducing the complexity of your request. You are not charged when this happens. Please note that this message was still added to history, so delete it if you wish.")
+        except DeadlineExceeded as e:
             self.chat.history.append({'parts': [{'text': message}], 'role': 'user'})
             if DEBUG:
                 print(f"DeadlineExceeded: Request timed out after {timeout} seconds.", tag='Debug', tag_color='red') # Log the timeout
             self.request_in_progress = False # Allow new requests
             self.progress_bar.setFormat("Response Timed Out")
-            return None, input_tokens
+            return None, input_tokens, DeadlineExceeded
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"An error occurred: {e}")
             if DEBUG:
                 print(f"Error sending message: {e}", tag='Debug', tag_color='red')
+                traceback.print_exc()
             self.request_in_progress = False # Allow new requests
             self.progress_bar.setFormat("Response Error")
-            return None, input_tokens
+            return None, input_tokens, e
     
     def send_message_thread(self, message, timeout):
         """Runs the asynchronous send_message_async in a separate thread."""
         async def run_task():
-            response, input_tokens = await self.send_message_async(message, timeout)
-            if response:
+            response, input_tokens, error = await self.send_message_async(message, timeout)
+            if not error:
                 self.handle_response(response, input_tokens)
             else:
                 self.progress_bar.setValue(self.progress_bar.maximum()) # Indicate completion (timeout or error)
+                if error == DeadlineExceeded:
+                    QMessageBox.warning(self, "Response Error", "DeadlineExceeded Error, try increasing timeout or reducing complexity of your prompt.")
+                else:
+                    QMessageBox.warning(self, "Response Error", str(error))
         
         try:
             self.loop.run_until_complete(run_task())
@@ -597,13 +601,13 @@ class MainWindow(QMainWindow):
             
             # Apply color based on message role 
             color = "green" if m['role'] == "User" else "cyan"
-            history_text.append(f"<hr style='width: 100%; border-top: 1px;'>{i+1}. <strong><span style='color:{color};'>{m['role']}:</span>, Tokens: {m['tokens']}, Cost to keep: ${input_cost:.5f}</strong><br><span style='white-space: pre-wrap;'>{content_preview}</span>")
+            history_text.append(f"<hr style='width: 100%; border-top: 1px;'>{i+1}. <strong><span style='color:{color};'>{m['role']}</span>, Tokens: {m['tokens']}, Cost to keep: ${input_cost:.5f}</strong><br><span style='white-space: pre-wrap;'>{content_preview}</span>")
         history_text.append(f"<hr><strong>Total cost to keep: ${total_cost:.5f}</strong>")
 
         if DEBUG:
             print('Model Chat History:', self.chat.history, tag='Debug', tag_color='cyan', color='white')
 
-        history_dialog = ViewMessageDialog("Chat History", "<br>".join(history_text))
+        history_dialog = ViewHistoryDialog("Chat History", "".join(history_text))
         history_dialog.exec()
 
     def load_chat_history(self):
@@ -1140,6 +1144,34 @@ class ViewMessageDialog(QDialog):
             except Exception as e:
                 print(f'Error: {e}', tag='Debug', tag_color='cyan', color='white')
                 # TODO: Pop up error occured
+
+class ViewHistoryDialog(QDialog):
+    def __init__(self, title, text, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+
+        layout = QVBoxLayout(self)
+
+        # Create a QTextEdit to display the chat history
+        self.history_text = QTextEdit(self)
+        self.history_text.setReadOnly(True)
+        self.history_text.setText(text)
+        
+        # Wrap the QTextEdit in a QScrollArea
+        scroll_area = QScrollArea(self)
+        scroll_area.setWidget(self.history_text)
+        scroll_area.setWidgetResizable(True) 
+
+        # Add the scroll area to the layout
+        layout.addWidget(scroll_area)
+
+        # Create a close button
+        close_button = QPushButton("Close", self)
+        close_button.clicked.connect(self.close)
+        close_button.setDefault(True) 
+        layout.addWidget(close_button) # Add the button directly to the main layout
+
+        self.setMinimumSize(800, 400) 
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
