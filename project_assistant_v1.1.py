@@ -1149,10 +1149,10 @@ class ViewMessageDialog(QDialog):
                             f.write(f"{role},{tokens},{content}")
                         case _:
                             raise ValueError("Invalid file format")
-                # TODO: Pop up message saved successfully
+                QMessageBox.information(self, "Message Saved Successfully", f"Message saved to: {filename}")
             except Exception as e:
                 print(f'Error: {e}', tag='Debug', tag_color='cyan', color='white')
-                # TODO: Pop up error occured
+                QMessageBox.critical(self, "Error Saving Message", f"An error occured while saving the message: {e}")
 
 class ViewHistoryDialog(QDialog):
     def __init__(self, title, text, parent=None):
