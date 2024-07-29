@@ -171,7 +171,7 @@ class MainWindow(QMainWindow):
         self.temperature = 1.0
         self.max_output_tokens = 8192
         self.stop_sequences = []
-        self.system_instructions = "You are an expert AI programming assistant specializing in: 1. Code Generation (high-quality, well-formatted code in any language, following best practices and user's style, producing snippets, functions, classes, or modules as needed, adapting to user's style); 2. Debugging (analyzing code for errors, providing clear explanations and fixes, considering broader context); 3. Project Management (helping with task breakdown, milestones, code organization, suggesting structures and tools); 4. Conceptual Understanding (grasping core ideas, suggesting patterns, structures, libraries, explaining complex concepts); 5. Interactive Collaboration (asking clarifying questions, proposing multiple solutions with explanations, adapting to feedback). Additional Capabilities (on request): Code Refactoring, Unit Test Generation, Code Documentation, External Resource Search. Formatting: You should not output newlines at the start or end of your response. Context: Access relevant code files and project context. Conciseness: Keep responses short, avoid emojis unless specifically requested." # default
+        self.system_instructions = "You are an expert AI programming assistant specializing in: 1. Code Generation (high-quality, well-formatted code in any language, following best practices and user's style, producing snippets, functions, classes, or modules as needed, adapting to user's style); 2. Debugging (analyzing code for errors, providing clear explanations and fixes, considering broader context); 3. Project Management (helping with task breakdown, milestones, code organization, suggesting structures and tools); 4. Conceptual Understanding (grasping core ideas, suggesting patterns, structures, libraries, explaining complex concepts); 5. Interactive Collaboration (asking clarifying questions, proposing multiple solutions with explanations, adapting to feedback). Additional Capabilities (on request): Code Refactoring, Unit Test Generation, Code Documentation, External Resource Search. Formatting: You should not output newlines at the start or end of your response. Context: Access relevant code files and project context. Conciseness: Keep responses short, avoid emojis unless specifically requested. Do not add newlines to the end of responses." # default
         self.safety_level = 'medium' # default
         self.safety_settings = MEDIUM_SAFETY
         self.system_message_displayed = False
@@ -485,7 +485,7 @@ class MainWindow(QMainWindow):
 
             return response, input_tokens, None
 
-        # Handle exceptions TODO: We need to move QBOX popups to main thread to prevent crashing
+        # Handle exceptions
         except DeadlineExceeded as e:
             self.chat.history.append({'parts': [{'text': message}], 'role': 'user'})
             if DEBUG:
@@ -510,7 +510,7 @@ class MainWindow(QMainWindow):
             else:
                 self.progress_bar.setValue(self.progress_bar.maximum()) # Indicate completion (timeout or error)
                 if error == DeadlineExceeded:
-                    QMessageBox.warning(self, "Response Error", "DeadlineExceeded Error, try increasing timeout or reducing complexity of your prompt.")
+                    QMessageBox.warning(self, "Timeout Error", "DeadlineExceeded Error, try increasing timeout or reducing complexity of your prompt.")
                 else:
                     QMessageBox.warning(self, "Response Error", str(error))
         
@@ -594,7 +594,7 @@ class MainWindow(QMainWindow):
         total_cost = 0.0
         for i, m in enumerate(self.messages):
             # Calculate message content preview, removing newlines
-            content_preview = m['content'][:100] + ' ... ' + m['content'][-100:] if len(m['content']) > 200 else m['content']
+            content_preview = m['content'][:100] + ' ... ' + m['content'][-100:] if len(m['content']) > 205 else m['content']
             content_preview = content_preview.replace('\n', ' ')
             input_cost = calculate_cost(m['tokens'], INPUT_PRICING, self.messages) # Calculate cost to keep message
             total_cost += input_cost
@@ -827,10 +827,20 @@ class MainWindow(QMainWindow):
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
 
+        # Create QLabel widgets for status information
+        self.session_cost_label = QLabel("Session Cost: $0.00000", self)
+        self.last_input_label = QLabel("| Last Input: 0 tokens, $0.00000", self)
+        self.last_output_label = QLabel("| Last Output: 0 tokens, $0.00000", self)
+
         # Create a progress bar
         self.progress_bar = QProgressBar(self)
         self.progress_bar.setFixedWidth(200) # Set a fixed width for the progress bar
         self.progress_bar.setMaximum(self.timeout) # Set the maximum value of the progress bar
+
+        # Add widgets to the status bar
+        self.status_bar.addPermanentWidget(self.session_cost_label)
+        self.status_bar.addPermanentWidget(self.last_input_label)
+        self.status_bar.addPermanentWidget(self.last_output_label)
         self.status_bar.addPermanentWidget(self.progress_bar) # Add the progress bar to the status bar
 
     def update_progress_bar(self):
@@ -911,16 +921,15 @@ class MainWindow(QMainWindow):
             self.chat = self.model.start_chat()
             self.display_message('System', 'Settings updated.') # Inform the user that the settings have been updated
 
-    def update_status_bar(self): # TODO: Make permanent widget instead of message so it doesn't clear when hovering over menu bar.
+    def update_status_bar(self):
         """Updates the status bar with session information."""
         last_message_input_cost = calculate_cost(self.last_input_tokens, INPUT_PRICING, self.messages)
         last_message_output_cost = calculate_cost(self.last_output_tokens, OUTPUT_PRICING, self.messages)
-        message = ( 
-            f"Session Cost: ${self.session_cost:.5f} | "
-            f"Last Message: Input: {self.last_input_tokens} tokens, ${last_message_input_cost:.5f}, "
-            f"Output: {self.last_output_tokens} tokens, ${last_message_output_cost:.5f}"
-        )
-        self.status_bar.showMessage(message)
+        
+        # Update QLabel text
+        self.session_cost_label.setText(f"Session Cost: ${self.session_cost:.5f}")
+        self.last_input_label.setText(f"| Last Input: {self.last_input_tokens} tokens, ${last_message_input_cost:.5f}")
+        self.last_output_label.setText(f"| Last Output: {self.last_output_tokens} tokens, ${last_message_output_cost:.5f}")
 
     def load_config(self):
         """Loads configuration settings from a JSON file."""
