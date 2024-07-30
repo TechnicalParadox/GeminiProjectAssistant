@@ -696,9 +696,9 @@ class MainWindow(QMainWindow):
                         case _:
                             raise ValueError("Invalid file format")
 
-                self.display_message("System", f"Chat history saved to {filename}")
+                QMessageBox.information(self, "Success", f"Chat history saved to {filename}")
             except Exception as e:
-                self.display_message("Error", f"Error saving chat history: {e}")
+                QMessageBox.critical(self, "Error", f"Failed to save chat history: {str(e)}")
 
     def create_menu_bar(self):
         """Creates the menu bar for the application."""
