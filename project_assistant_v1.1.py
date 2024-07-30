@@ -384,7 +384,7 @@ class MainWindow(QMainWindow):
             except ValueError:
                 self.display_message("Error", "Invalid input. Enter message indices as comma-separated numbers.")
     
-    def add_files_to_context(self): # TODO: Add functionality for ignored files and file extensions
+    def add_files_to_context(self):
         """Adds files to the chat context."""
 
         file_dialog = QFileDialog()
@@ -494,6 +494,7 @@ class MainWindow(QMainWindow):
             self.progress_bar.setFormat("Response Timed Out")
             return None, input_tokens, DeadlineExceeded
         except Exception as e:
+            self.chat.history.append({'parts': [{'text': message}], 'role': 'user'})
             if DEBUG:
                 print(f"Error sending message: {e}", tag='Debug', tag_color='red')
                 traceback.print_exc()
@@ -510,9 +511,9 @@ class MainWindow(QMainWindow):
             else:
                 self.progress_bar.setValue(self.progress_bar.maximum()) # Indicate completion (timeout or error)
                 if error == DeadlineExceeded:
-                    QMessageBox.warning(self, "Timeout Error", "DeadlineExceeded Error, try increasing timeout or reducing complexity of your prompt.")
+                    QMessageBox.warning(self, "Timeout Error", "Your message was still added to history. Delete if necessary. DeadlineExceeded Error, try increasing timeout or reducing complexity of your prompt.")
                 else:
-                    QMessageBox.warning(self, "Response Error", str(error))
+                    QMessageBox.warning(self, "Response Error", f"Your message was still added to history. Delete if necessary. Response error: {str(error)}")
         
         try:
             self.loop.run_until_complete(run_task())
@@ -587,6 +588,44 @@ class MainWindow(QMainWindow):
                 message_dialog.exec()
             except IndexError:
                 self.display_message("Error", "Invalid message index.")
+
+    def import_message(self):
+        """Imports a single message from a JSON file."""
+        file_dialog = QFileDialog(self)
+        file_dialog.setNameFilter("JSON Message (*.json)")
+        if file_dialog.exec():
+            filename = file_dialog.selectedFiles()[0]
+            try:
+                with open(filename, 'r') as f:
+                    message_data = json.load(f)
+                
+                # Validate JSON structure
+                if not all(key in message_data for key in ("role", "content", "tokens")):
+                    QMessageBox.critical(self, "Error", f"Unable to import message: {filename}")
+                    return
+
+                # Extract data from JSON
+                role = message_data["role"]
+                content = message_data["content"]
+                tokens = message_data["tokens"]
+
+                # Append to chat history and model history
+                self.display_message("System", f"Message imported from {filename}")
+                self.messages.append({"role": role, "content": content, "tokens": tokens})
+                self.chat.history.append({'parts': [{'text': content}], 'role': role})
+                self.display_message(role, content)
+
+                # Add tokens to total token count
+                self.total_input_tokens += int(tokens)
+
+                # Update UI
+                self.update_chat_window()
+                self.update_status_bar()
+            
+            except json.JSONDecodeError:
+                QMessageBox.critical(self, "Invalid JSON", f"Invalid JSON file: {filename}")
+            except Exception as e:
+                QMessageBox.critical(self, "Import Error", f"Error importing message: {str(e)}")
 
     def display_chat_history(self):
         """Displays a concise chat history in a larger message box."""
@@ -718,6 +757,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(save_action)
 
         # TODO: Save entire session chat history (need to track session history seperately from chat history)
+        # Shortcut should be Ctrl+Shift+S
 
         # **Tools Menu**
         tools_menu = menu_bar.addMenu("Tools")
@@ -736,6 +776,11 @@ class MainWindow(QMainWindow):
         history_action.setShortcut("Ctrl+H")
         history_action.triggered.connect(self.display_chat_history)
         tools_menu.addAction(history_action)
+
+        import_msg_action = QAction("Import Message", self)
+        import_msg_action.setShortcut("Ctrl+I")
+        import_msg_action.triggered.connect(self.import_message)
+        tools_menu.addAction(import_msg_action)
 
         view_action = QAction("View Full Message", self)
         view_action.setShortcut("Ctrl+M")
@@ -994,8 +1039,8 @@ class MainWindow(QMainWindow):
             SI_TOKENS = self.model.count_tokens(" ").total_tokens
             self.system_instruction_tokens = SI_TOKENS
             self.display_message("System Instructions", self.system_instructions)
-            self.display_message("Tokens", SI_TOKENS)
-            self.display_message("Cost", f"${calculate_cost(SI_TOKENS, INPUT_PRICING, self.messages):.5f}")
+            self.display_message("System Instructions Tokens", SI_TOKENS)
+            self.display_message("System Instructions Cost", f"${calculate_cost(SI_TOKENS, INPUT_PRICING, self.messages):.5f}")
             self.system_message_displayed = True # Resetting this here
 
         except InvalidArgument as e:
