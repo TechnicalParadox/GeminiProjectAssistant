@@ -559,7 +559,7 @@ class MainWindow(QMainWindow):
         color = ""
         match sender:
             case "User":
-                color = "green" 
+                color = "lightgreen" 
             case "Model":
                 color = "cyan"
                 # Replace code blocks with <pre> tags
@@ -573,9 +573,9 @@ class MainWindow(QMainWindow):
             case "Warning":
                 color = "orange" 
             case _:
-                color = "magenta" 
+                color = "yellow" 
 
-        formatted_message = f"<hr style='width: 100%; border-top: 1px;'><p style='margin: 0px;'><strong style='color:{color};'>{sender}:</strong> <span style='white-space: pre-wrap;'>{message}</span></p>"
+        formatted_message = f"<hr style='width: 100%; border-top: 1px;'><p style='margin: 0px;'><strong style='color:{color}; background-color:black;'>{sender}:</strong> <span style='white-space: pre-wrap;'>{message}</span></p>"
         self.chat_history.append(formatted_message) # Append to chat_history list
         self.update_chat_window() # Update the chat window
 
@@ -590,9 +590,9 @@ class MainWindow(QMainWindow):
                 prefix = ''
                 print(f'Viewing message: {message}', tag='Debug', tag_color='cyan', color='white')
                 if message['role'] == 'User':
-                    prefix = f'<strong style="color:green;">User</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
+                    prefix = f'<strong style="color:lightgreen; background-color:black;">User</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
                 else:
-                    prefix = f'<strong style="color:cyan;">Model</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
+                    prefix = f'<strong style="color:cyan; background-color:black">Model</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
 
                 message_dialog = ViewMessageDialog("Message Content", (prefix + f"<span style='white-space: pre-wrap;'>{message['content']}</span>"), message)
                 message_dialog.exec()
@@ -649,8 +649,8 @@ class MainWindow(QMainWindow):
             total_cost += input_cost
             
             # Apply color based on message role 
-            color = "green" if m['role'] == "User" else "cyan"
-            history_text.append(f"<hr style='width: 100%; border-top: 1px;'>{i+1}. <strong><span style='color:{color};'>{m['role']}</span>, Tokens: {m['tokens']}, Cost to keep: ${input_cost:.5f}</strong><br><span style='white-space: pre-wrap;'>{content_preview}</span>")
+            color = "lightgreen" if m['role'] == "User" else "cyan"
+            history_text.append(f"<hr style='width: 100%; border-top: 1px;'>{i+1}. <strong><span style='color:{color}; background-color: black'>{m['role']}</span>, Tokens: {m['tokens']}, Cost to keep: ${input_cost:.5f}</strong><br><span style='white-space: pre-wrap;'>{content_preview}</span>")
         history_text.append(f"<hr><strong>Total cost to keep: ${total_cost:.5f}</strong>")
 
         if DEBUG:
@@ -792,7 +792,7 @@ class MainWindow(QMainWindow):
         import_msg_action.triggered.connect(self.import_message)
         tools_menu.addAction(import_msg_action)
 
-        view_action = QAction("View Full Message", self)
+        view_action = QAction("View/Export Full Message", self)
         view_action.setShortcut("Ctrl+M")
         view_action.triggered.connect(self.view_full_message)
         tools_menu.addAction(view_action)
