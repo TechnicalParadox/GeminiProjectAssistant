@@ -10,12 +10,12 @@ from dotenv import load_dotenv, set_key
 from google.generativeai.types import HarmCategory, HarmBlockThreshold, generation_types
 from google.api_core.exceptions import DeadlineExceeded, InvalidArgument
 from PyQt6.QtWidgets import ( QApplication, QMainWindow, QProgressBar, QWidget, QPushButton, QScrollArea, QLabel, QVBoxLayout, QLineEdit, QMessageBox, QFileDialog, QTextEdit,
-                              QFontDialog, QColorDialog, QInputDialog, QListWidget, QStatusBar, QHBoxLayout, QComboBox, QSpinBox, QDoubleSpinBox, QDialog, QSizePolicy
+                              QFontDialog, QColorDialog, QInputDialog, QListWidget, QStatusBar, QHBoxLayout, QComboBox, QSpinBox, QDoubleSpinBox, QDialog, QSizePolicy, QCheckBox
                             )
 from PyQt6.QtCore import Qt, QSize, QEvent, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import QFont, QColor, QAction
 
-DEBUG = True  # Set to True to enable debug messages
+
 
 # Calculate the .env file path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +24,7 @@ ENV_FILE = os.path.join(SCRIPT_DIR, '.env')
 # Load environment variables once at the start
 load_dotenv(dotenv_path=ENV_FILE) 
 API_KEY = os.getenv('API_KEY')
+DEBUG = True if os.getenv('DEBUG').lower() == 'true' else False
 
 # Gemini Safety Settings - for more info visit https://ai.google.dev/gemini-api/docs/safety-settings
 #  No safety settings
@@ -1317,6 +1318,12 @@ class SettingsDialog(QDialog):
         layout.addWidget(self.system_instructions_label)
         layout.addWidget(self.system_instructions_edit)
 
+        # Debug Toggle
+        self.debug_label = QLabel("Enable Debug Mode:")
+        self.debug_checkbox = QCheckBox(self)
+        layout.addWidget(self.debug_label)
+        layout.addWidget(self.debug_checkbox)
+
         # Buttons
         button_box = QHBoxLayout()
         self.save_button = QPushButton("Save", self)
@@ -1352,6 +1359,11 @@ class SettingsDialog(QDialog):
                 self.max_output_tokens_spin.setValue(config.get('max_output_tokens', self.parent().max_output_tokens))
                 self.stop_sequences_edit.setText(", ".join(config.get('stop_sequences', self.parent().stop_sequences)))
                 self.system_instructions_edit.setPlainText(config.get('system_instructions', self.parent().system_instructions)) # Use setPlainText for QTextEdit
+
+                if DEBUG:
+                    self.debug_checkbox.setChecked(True)
+                else:
+                    self.debug_checkbox.setChecked(False)
         except FileNotFoundError:
             # Handle case where file doesn't exist (e.g., first time running)
 
@@ -1375,6 +1387,11 @@ class SettingsDialog(QDialog):
         """Save settings to config.json."""
         config_file = os.path.join(SCRIPT_DIR, 'config.json')
         try:
+            if self.debug_checkbox.isChecked():
+                set_key(ENV_FILE, 'DEBUG', 'true')
+            else:
+                set_key(ENV_FILE, 'DEBUG', 'false')
+
             # Get the current settings from the UI elements
             config = {
                 'model': self.model_combo.currentText(),
