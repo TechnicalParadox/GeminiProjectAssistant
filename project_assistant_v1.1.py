@@ -133,6 +133,8 @@ def calculate_cost(tokens, pricing, messages):
 
 class MainWindow(QMainWindow):
     response_receieved = pyqtSignal(object, int) # Signal to indicate response received
+    timeout_occurred = pyqtSignal()
+    error_occured = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -143,6 +145,8 @@ class MainWindow(QMainWindow):
         self.request_in_progress = False # Flag to track ongoing requests
 
         self.response_receieved.connect(self.update_ui_with_response) # Connect signal to slot
+        self.timeout_occurred.connect(self.handle_timeout)
+        self.error_occured.connect(self.handle_error)
 
         self.setWindowTitle("Gemini Project Assistant")
         self.setGeometry(100, 100, 1200, 800)
@@ -491,7 +495,6 @@ class MainWindow(QMainWindow):
             if DEBUG:
                 print(f"DeadlineExceeded: Request timed out after {timeout} seconds.", tag='Debug', tag_color='red') # Log the timeout
             self.request_in_progress = False # Allow new requests
-            self.progress_bar.setFormat("Response Timed Out")
             return None, input_tokens, DeadlineExceeded
         except Exception as e:
             self.chat.history.append({'parts': [{'text': message}], 'role': 'user'})
@@ -499,7 +502,6 @@ class MainWindow(QMainWindow):
                 print(f"Error sending message: {e}", tag='Debug', tag_color='red')
                 traceback.print_exc()
             self.request_in_progress = False # Allow new requests
-            self.progress_bar.setFormat("Response Error")
             return None, input_tokens, e
     
     def send_message_thread(self, message, timeout):
@@ -511,9 +513,9 @@ class MainWindow(QMainWindow):
             else:
                 self.progress_bar.setValue(self.progress_bar.maximum()) # Indicate completion (timeout or error)
                 if error == DeadlineExceeded:
-                    QMessageBox.warning(self, "Timeout Error", "Your message was still added to history. Delete if necessary. DeadlineExceeded Error, try increasing timeout or reducing complexity of your prompt.")
+                    self.timeout_occurred.emit()
                 else:
-                    QMessageBox.warning(self, "Response Error", f"Your message was still added to history. Delete if necessary. Response error: {str(error)}")
+                    self.error_occured.emit(str(error))
         
         try:
             self.loop.run_until_complete(run_task())
@@ -525,6 +527,14 @@ class MainWindow(QMainWindow):
         self.request_in_progress = False # Allow new requests
         self.progress_bar.setFormat("Response Received")
         self.response_receieved.emit(response, input_tokens) # Emit signal with response and input tokens
+    
+    def handle_timeout(self):
+        self.progress_bar.setFormat("Response Timed Out")
+        QMessageBox.warning(self, "Timeout Error", "Your message was still added to history. Delete if necessary. DeadlineExceeded Error, try increasing timeout or reducing complexity of your prompt.")
+    
+    def handle_error(self, error_message):
+        self.progress_bar.setFormat("Response Error")
+        QMessageBox.warning(self, "Response Error", f"Your message was still added to history. Delete if necessary. Response error: {error_message}")
     
     def update_ui_with_response(self, response, input_tokens):
         """Updates the UI with the response from the model."""
