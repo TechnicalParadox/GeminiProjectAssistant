@@ -24,7 +24,7 @@ ENV_FILE = os.path.join(SCRIPT_DIR, '.env')
 # Load environment variables once at the start
 load_dotenv(dotenv_path=ENV_FILE) 
 API_KEY = os.getenv('API_KEY')
-DEBUG = True if os.getenv('DEBUG').lower() == 'true' else False
+DEBUG = False if os.getenv('DEBUG') == None or os.getenv('DEBUG').lower() == 'false' else True
 
 # Gemini Safety Settings - for more info visit https://ai.google.dev/gemini-api/docs/safety-settings
 #  No safety settings
