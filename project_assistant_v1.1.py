@@ -595,7 +595,7 @@ class MainWindow(QMainWindow):
                 else:
                     prefix = f'<strong style="color:cyan; background-color:black">Model</strong> | Tokens: {message["tokens"]} | Cost to keep: ${calculate_cost(message["tokens"], INPUT_PRICING, self.messages):.5f}<hr>'
 
-                message_dialog = ViewMessageDialog("Message Content", (prefix + f"<span style='white-space: pre-wrap;'>{message['content']}</span>"), message)
+                message_dialog = ViewMessageDialog("Message Content", (prefix + f"<pre><span style='white-space: pre-wrap;'>{message['content']}</span></pre>"), message)
                 message_dialog.exec()
             except IndexError:
                 self.display_message("Error", "Invalid message index.")
