@@ -541,7 +541,7 @@ class MainWindow(QMainWindow):
         """Updates the UI with the response from the model."""
         self.last_input_tokens = response.usage_metadata.prompt_token_count
         self.last_output_tokens = response.usage_metadata.candidates_token_count
-        self.total_input_tokens += input_tokens  # Only add the input tokens without system instructions
+        self.total_input_tokens += self.last_input_tokens  # Only add the input tokens without system instructions
         self.total_output_tokens += self.last_output_tokens
 
         # Add Model response to chat history
