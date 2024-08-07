@@ -49,6 +49,7 @@ You can set the project directory to your project directory. When using this app
 * **Cost Tracking:** Tracks the cost of each interaction with the Gemini API, as well as the total session cost, to help you stay within your budget.
 * **Contextual Awareness:** Provides the ability to add files and their content as context to the AI, allowing for more relevant and accurate responses.
 * **History Management:** Allows for saving chat history, viewing past interactions within the current conversation, and deleting messages from context to save tokens/cost.
+* **Documentation Scraping:** Allows you to scrape API docs from URLs and send as context, improving quality of responses.
 * **Customizable:** Configure the model, safety settings, timeout, and project directory through a config.json file.
 ## Roadmap
 * **Error Handling:** Improve the application's handling of potential errors from the Gemini API for a more robust user experience.
