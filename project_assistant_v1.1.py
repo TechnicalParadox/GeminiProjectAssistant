@@ -475,7 +475,7 @@ class MainWindow(QMainWindow):
         if not directory:
             return  # User cancelled the dialog
 
-        files_context = ""
+        files_context = "This is documentation scraped from a URL, use it to improve quality of your responses:\n"
         total_tokens = 0
         file_count = 0
 
@@ -515,7 +515,8 @@ class MainWindow(QMainWindow):
             self,
             "Scrape Documentation",
             "This tool will scrape all subpages of a URL into .txt files.\n"
-            "Use it to grab the documentation for APIs, etc. and reference them when talking to the assistant."
+            "Use it to grab the documentation for APIs, etc. and reference them when talking to the assistant.\n"
+            "WARNING: This may take a long time! You will receive a popup when finished or if theres an error."
         )
         url, ok = QInputDialog.getText(self, "Enter URL", "Enter the URL to scrape:")
         if ok:
@@ -860,7 +861,7 @@ class MainWindow(QMainWindow):
         tools_menu.addAction(send_docs_action)
 
         scrape_docs_action = QAction("Scrape Docs from URL", self)
-        scrape_docs_action.setShortcut("Ctrl+Shift+Alt+D")
+        scrape_docs_action.setShortcut("Ctrl+Shift+S")
         scrape_docs_action.triggered.connect(self.scrape_docs_from_url)
         tools_menu.addAction(scrape_docs_action)
         
