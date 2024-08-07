@@ -13,7 +13,7 @@ from google.api_core.exceptions import DeadlineExceeded, InvalidArgument
 from PyQt6.QtWidgets import ( QApplication, QMainWindow, QProgressBar, QWidget, QPushButton, QScrollArea, QLabel, QVBoxLayout, QLineEdit, QMessageBox, QFileDialog, QTextEdit,
                               QFontDialog, QColorDialog, QInputDialog, QListWidget, QStatusBar, QHBoxLayout, QComboBox, QSpinBox, QDoubleSpinBox, QDialog, QSizePolicy, QCheckBox
                             )
-from PyQt6.QtCore import Qt, QSize, QEvent, QTimer, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QSize, QEvent, QTimer, QThread, pyqtSignal, QProcess
 from PyQt6.QtGui import QFont, QColor, QAction
 
 
@@ -520,24 +520,44 @@ class MainWindow(QMainWindow):
         )
         url, ok = QInputDialog.getText(self, "Enter URL", "Enter the URL to scrape:")
         if ok:
-            try:
-                # Assuming 'docscraper.py' is in the same directory as your main script
-                script_path = os.path.join(SCRIPT_DIR, "tools", "DocScraper", "docscraper.py") 
-                result = subprocess.run(
-                    [sys.executable, script_path],  # Run with Python interpreter
-                    input=url,  # Pass URL as input to the script
-                    capture_output=True,  # Capture output
-                    text=True             # Capture output as text
-                )
-                
-                if result.returncode == 0:
-                    QMessageBox.information(self, "Scraping Complete", "Documentation scraped successfully!")
-                else:
-                    QMessageBox.warning(self, "Scraping Error", f"An error occurred during scraping:\n{result.stderr}")
-            except FileNotFoundError:
-                QMessageBox.critical(self, "Script Not Found", f"Could not find the docscraper script at: {script_path}")
-            except Exception as e:
-                QMessageBox.critical(self, "Scraping Error", f"An error occurred during scraping: {e}")
+            self.progress_bar.setValue(0)
+            self.progress_bar.setMaximum(100)  # Indeterminate progress
+            self.progress_bar.setFormat("Scraping URL")
+
+            self.process = QProcess()
+            self.process.setProgram(sys.executable)
+            script_path = os.path.join(SCRIPT_DIR, "tools", "DocScraper", "docscraper.py")
+            self.process.setArguments([script_path, url, "scrape_and_save"]) # Pass url and function name as arguments
+
+            self.process.finished.connect(self.handle_scraper_finished)
+
+            self.process.start()
+
+            # Start animation timer
+            self.scraping_animation_state = (0)
+            self.animation_timer = QTimer(self)
+            self.animation_timer.timeout.connect(self.update_scraping_animation)
+            self.animation_timer.start(1000)
+    
+    def update_scraping_animation(self):
+        """Updates the progress bar animation."""
+        animation_states = ["Scraping URL", "Scraping URL.", "Scraping URL..", "Scraping URL..."]
+        self.progress_bar.setFormat(animation_states[self.scraping_animation_state])
+        self.scraping_animation_state = (self.scraping_animation_state + 1) % len(animation_states)
+
+    def handle_scraper_finished(self, exit_code, exit_status):
+        """Handles the docscraper process finishing."""
+        if exit_code == 0:
+            self.animation_timer.stop()
+            self.progress_bar.setValue(self.progress_bar.maximum())  # Indicate completion
+            self.progress_bar.setFormat("Scraping Complete")
+            QMessageBox.information(self, "Scraping Complete", "Documentation scraped successfully!")
+        else:
+            self.animation_timer.stop()
+            self.progress_bar.setValue(self.progress_bar.maximum())  # Indicate completion
+            self.progress_bar.setFormat("Scraping Incomplete")
+            error_output = bytes(self.process.readAllStandardError()).decode()  # Get error output
+            QMessageBox.warning(self, "Scraping Error", f"An error occurred during scraping:\n{error_output}")
 
     async def send_message_async(self, message, timeout):
         """Sends the message asynchronously to the Gemini model and handles the response."""
