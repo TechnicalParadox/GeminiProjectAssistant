@@ -1,0 +1,3 @@
+[submodule "tools/DocScraper"]
+	path = tools/DocScraper
+	url = https://github.com/TechnicalParadox/DocScraper.git

@@ -4,6 +4,7 @@ import os
 import json
 import asyncio
 import re
+import subprocess
 from print_color import print
 import google.generativeai as genai
 from dotenv import load_dotenv, set_key
@@ -508,6 +509,35 @@ class MainWindow(QMainWindow):
                 self.display_message("File", f"File Documentation directory sent to model: {directory}")
                 self.send_message(True)  # Send using the files_context 
 
+    def scrape_docs_from_url(self):
+        """Scrapes documentation from a given URL using the docscraper script."""
+        QMessageBox.information(
+            self,
+            "Scrape Documentation",
+            "This tool will scrape all subpages of a URL into .txt files.\n"
+            "Use it to grab the documentation for APIs, etc. and reference them when talking to the assistant."
+        )
+        url, ok = QInputDialog.getText(self, "Enter URL", "Enter the URL to scrape:")
+        if ok:
+            try:
+                # Assuming 'docscraper.py' is in the same directory as your main script
+                script_path = os.path.join(SCRIPT_DIR, "tools", "DocScraper", "docscraper.py") 
+                result = subprocess.run(
+                    [sys.executable, script_path],  # Run with Python interpreter
+                    input=url,  # Pass URL as input to the script
+                    capture_output=True,  # Capture output
+                    text=True             # Capture output as text
+                )
+                
+                if result.returncode == 0:
+                    QMessageBox.information(self, "Scraping Complete", "Documentation scraped successfully!")
+                else:
+                    QMessageBox.warning(self, "Scraping Error", f"An error occurred during scraping:\n{result.stderr}")
+            except FileNotFoundError:
+                QMessageBox.critical(self, "Script Not Found", f"Could not find the docscraper script at: {script_path}")
+            except Exception as e:
+                QMessageBox.critical(self, "Scraping Error", f"An error occurred during scraping: {e}")
+
     async def send_message_async(self, message, timeout):
         """Sends the message asynchronously to the Gemini model and handles the response."""
         try:
@@ -828,6 +858,11 @@ class MainWindow(QMainWindow):
         send_docs_action.setShortcut("Ctrl+Shift+D")
         send_docs_action.triggered.connect(self.send_docs_directory)
         tools_menu.addAction(send_docs_action)
+
+        scrape_docs_action = QAction("Scrape Docs from URL", self)
+        scrape_docs_action.setShortcut("Ctrl+Shift+Alt+D")
+        scrape_docs_action.triggered.connect(self.scrape_docs_from_url)
+        tools_menu.addAction(scrape_docs_action)
         
         history_action = QAction("Display Chat History", self)
         history_action.setShortcut("Ctrl+H")
