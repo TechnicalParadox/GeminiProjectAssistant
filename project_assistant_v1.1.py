@@ -467,6 +467,47 @@ class MainWindow(QMainWindow):
             self.files_message = user_message
             self.send_message(True)  # Send the user message to the model
     
+    def send_docs_directory(self):
+        """Sends all .txt files in a selected directory to the model."""
+
+        directory = QFileDialog.getExistingDirectory(self, "Select Documentation Directory")
+        if not directory:
+            return  # User cancelled the dialog
+
+        files_context = ""
+        total_tokens = 0
+        file_count = 0
+
+        for root, _, files in os.walk(directory):
+            for file in files:
+                if file.endswith(".txt"):
+                    file_path = os.path.join(root, file)
+                    try:
+                        with open(file_path, 'r', errors='ignore') as f:
+                            content = f.read()
+                            files_context += f"File: {file_path}\n```\n{content}\n```\n"
+                            file_count += 1
+                            total_tokens += self.model.count_tokens(content).total_tokens
+                    except Exception as e:
+                        self.display_message("Error", f"Error reading file {file_path}: {e}")
+
+        if file_count == 0:
+            self.display_message("Info", f"No .txt files found in {directory}")
+            return
+
+        # Display token count and get user message
+        QMessageBox.information(self, "Token Count", f"Total tokens from files: {total_tokens}")
+        
+        # Get user message using MessageInputDialog
+        dialog = MessageInputDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            user_message = dialog.message_edit.toPlainText().strip()
+            if user_message: 
+                self.files_context = files_context + "User message: "
+                self.files_message = user_message
+                self.display_message("File", f"File Documentation directory sent to model: {directory}")
+                self.send_message(True)  # Send using the files_context 
+
     async def send_message_async(self, message, timeout):
         """Sends the message asynchronously to the Gemini model and handles the response."""
         try:
@@ -782,6 +823,11 @@ class MainWindow(QMainWindow):
         files_action.setShortcut("Ctrl+F")
         files_action.triggered.connect(self.add_files_to_context)
         tools_menu.addAction(files_action)
+
+        send_docs_action = QAction("Send Docs Directory", self)
+        send_docs_action.setShortcut("Ctrl+Shift+D")
+        send_docs_action.triggered.connect(self.send_docs_directory)
+        tools_menu.addAction(send_docs_action)
         
         history_action = QAction("Display Chat History", self)
         history_action.setShortcut("Ctrl+H")
