@@ -210,7 +210,7 @@ class MainWindow(QMainWindow):
         # Set pricing based on model
         global PRICING_DATE, PRICING_MODEL, INPUT_PRICING, OUTPUT_PRICING
         match self.model_name:
-            case 'gemini-1.5-pro-latest':
+            case 'gemini-1.5-pro-latest' | 'gemini-1.5-pro-exp-0801':
                 PRICING_DATE = G1_5_PRO_PRICING_DATE
                 PRICING_MODEL = G1_5_PRO_PRICING_MODEL
                 INPUT_PRICING = G1_5_PRO_INPUT_PRICING
@@ -1352,7 +1352,7 @@ class SettingsDialog(QDialog):
         # Model Selection
         self.model_label = QLabel("Model:")
         self.model_combo = QComboBox(self)
-        self.model_combo.addItems(["gemini-1.5-pro-latest", "gemini-1.5-flash-latest"]) # Add more models as needed
+        self.model_combo.addItems(["gemini-1.5-pro-latest", "gemini-1.5-flash-latest", "gemini-1.5-pro-exp-0801"]) # Add more models as needed
         layout.addWidget(self.model_label)
         layout.addWidget(self.model_combo)
 
