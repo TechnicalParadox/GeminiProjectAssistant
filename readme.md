@@ -40,7 +40,8 @@ sudo apt install python3-xlib libx11-xcb-dev libxcb-cursor0 libxrender1 libxi6
 9. Follow instructions on the screen.
 
 **NOTE:** If you want to enable scraping docs from URL, you must install https://github.com/TechnicalParadox/DocScraper in your installation directory. File structure should look like this (`installation_dir/tools/DocScraper/docscraper.py`). Make sure you install the requirements. (`cd installation_dir/tools/DocScraper/`, `pip install -r requirements.txt`)
-Detailed installation video: (https://youtu.be/sVS9sux5WbE)[https://youtu.be/sVS9sux5WbE]
+
+#### Detailed installation video: (https://youtu.be/sVS9sux5WbE)[https://youtu.be/sVS9sux5WbE]
 
 ## Usage
 [example of a saved output log in markdown format.](https://github.com/TechnicalParadox/GeminiProjectAssistant/blob/master/examples/example_use.md)
